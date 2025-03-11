@@ -10,6 +10,9 @@ from agents.analysis_agent import AnalysisAgent
 from agents.planning_agent import PlanningAgent
 from agents.summarization_agent import SummarizationAgent
 
+# Import memory manager
+from memory import MemoryManager
+
 # Import prompt functions
 from prompts.analysis_prompts import (
     initial_analysis_prompt,
@@ -31,7 +34,6 @@ class DeepThinkingChain:
         self.max_iterations = max_iterations
         self.iteration = 0
         self.analyses = []
-        self.memory = {}
         
         # Initialize agents
         self.tool_agent = ToolAgent()
@@ -40,68 +42,13 @@ class DeepThinkingChain:
         self.summarization_agent = SummarizationAgent()
         
         # Create necessary directories
-        os.makedirs('memory', exist_ok=True)
         os.makedirs('results', exist_ok=True)
         
-        # Initialize or load memory
-        self.memory_file = f"memory/{self.symbol}_memory.json"
-        if os.path.exists(self.memory_file):
-            try:
-                with open(self.memory_file, 'r') as f:
-                    self.memory = json.load(f)
-                print(f"📂 Loaded existing memory for {self.symbol}")
-            except json.JSONDecodeError:
-                print(f"⚠️ Error loading memory file. Creating new memory.")
-                self._initialize_memory()
-        else:
-            self._initialize_memory()
-    
-    def _initialize_memory(self):
-        """Initialize a new memory structure for the analysis process."""
-        self.memory = {
-            "symbol": self.symbol,
-            "iterations": [],
-            "current_focus": "financial_performance",
-            "required_focus_areas": [
-                "financial_performance",
-                "competitive_analysis",
-                "growth_prospects",
-                "risk_assessment"
-            ],
-            "completed_focus_areas": [],
-            "start_time": datetime.now().isoformat(),
-            "completion_percentage": 0
-        }
-        self._save_memory()
-        print(f"📝 Created new memory for {self.symbol}")
-    
-    def _save_memory(self):
-        """Save the current memory state to disk."""
-        try:
-            with open(self.memory_file, 'w') as f:
-                json.dump(self.memory, f, indent=2)
-        except Exception as e:
-            print(f"⚠️ Error saving memory: {str(e)}")
-    
-    def _update_completion_percentage(self):
-        """Update the analysis completion percentage based on iterations and focus areas."""
-        required_areas = self.memory.get("required_focus_areas", [])
-        completed_areas = self.memory.get("completed_focus_areas", [])
+        # Initialize memory manager
+        self.memory_manager = MemoryManager(symbol)
         
-        # Base percentage on completed focus areas and iteration count
-        if not required_areas:
-            area_percentage = 0
-        else:
-            area_percentage = (len(completed_areas) / len(required_areas)) * 100
-        
-        # Factor in iteration count (each iteration contributes up to 20%)
-        iteration_percentage = min(self.iteration / self.max_iterations * 20, 20)
-        
-        # Combine the two factors
-        total_percentage = min(area_percentage * 0.8 + iteration_percentage, 100)
-        
-        self.memory["completion_percentage"] = round(total_percentage, 1)
-        return self.memory["completion_percentage"]
+        # Update memory with max iterations
+        self.memory_manager.update_memory({"max_iterations": max_iterations})
     
     def run(self) -> str:
         """Runs the iterative deep thinking workflow, coordinating agents, and storing context.
@@ -118,13 +65,25 @@ class DeepThinkingChain:
         """
         print(f"🔍 Starting Deep Thinking Chain analysis for {self.symbol}...")
         
+        # Get memory state
+        memory = self.memory_manager.get_memory()
+        
+        # Initialize variables from memory
+        self.iteration = len(memory.get("iterations", []))
+        current_focus = memory.get("current_focus", "financial_performance")
+        completed_focus_areas = memory.get("completed_focus_areas", [])
+        
+        # Load any existing analyses from memory
+        for iteration in memory.get("iterations", []):
+            if "analysis" in iteration:
+                self.analyses.append(iteration["analysis"])
+        
         continue_analysis = True
         while continue_analysis and self.iteration < self.max_iterations:
             self.iteration += 1
             print(f"\n📊 Iteration {self.iteration}/{self.max_iterations}")
             
             # Step 1: Tool Agent - Fetch data based on current focus
-            current_focus = self.memory.get("current_focus", "financial_performance")
             print(f"🔧 Tool Agent: Fetching data for {self.symbol} with focus on {current_focus}...")
             
             try:
@@ -185,10 +144,6 @@ class DeepThinkingChain:
                 # Add to analyses list
                 self.analyses.append(analysis_result)
                 
-                # Add focus area to completed list if not already there
-                if current_focus not in self.memory.get("completed_focus_areas", []):
-                    self.memory.setdefault("completed_focus_areas", []).append(current_focus)
-                
                 # Print analysis summary
                 print(f"📊 Analysis complete: {analysis_result.get('sentiment', 'N/A')} sentiment with {analysis_result.get('confidence', 'N/A')} confidence")
                 print(f"🔑 Key points:")
@@ -219,29 +174,38 @@ class DeepThinkingChain:
                 "data_keys": list(data.keys()),
                 "analysis": analysis_result
             }
-            self.memory["iterations"].append(iteration_memory)
             
-            # Update completion percentage
-            completion = self._update_completion_percentage()
+            # Update memory with iteration data
+            self.memory_manager.add_iteration(iteration_memory)
+            
+            # Update focus area in memory
+            self.memory_manager.update_focus_area(current_focus, completed=True)
+            
+            # Get updated completion percentage
+            memory = self.memory_manager.get_memory()
+            completion = memory.get("completion_percentage", 0)
             print(f"📈 Analysis progress: {completion}% complete")
-            
-            # Save memory after each iteration
-            self._save_memory()
             
             # Step 3: Planning Agent - Determine next steps
             print("📝 Planning Agent: Determining next steps...")
             try:
+                # Get latest memory state for planning
+                memory = self.memory_manager.get_memory()
+                
                 planning_result = self.planning_agent.plan_next(
                     analysis_result=analysis_result,
                     iteration=self.iteration,
                     max_iterations=self.max_iterations,
-                    completed_focus_areas=self.memory.get("completed_focus_areas", []),
-                    required_focus_areas=self.memory.get("required_focus_areas", [])
+                    completed_focus_areas=memory.get("completed_focus_areas", []),
+                    required_focus_areas=memory.get("required_focus_areas", [])
                 )
                 
                 # Update memory with planning results
-                self.memory["current_focus"] = planning_result.get("next_focus")
-                self.memory["planning_reasoning"] = planning_result.get("reasoning")
+                current_focus = planning_result.get("next_focus")
+                self.memory_manager.update_memory({
+                    "current_focus": current_focus,
+                    "planning_reasoning": planning_result.get("reasoning")
+                })
                 
                 # Check if we should continue or move to summarization
                 continue_analysis = planning_result.get("continue_analysis", False)
@@ -257,8 +221,9 @@ class DeepThinkingChain:
             except Exception as e:
                 print(f"⚠️ Error during planning: {str(e)}")
                 # Default to continuing with a different focus area if possible
-                completed_areas = self.memory.get("completed_focus_areas", [])
-                required_areas = self.memory.get("required_focus_areas", [])
+                memory = self.memory_manager.get_memory()
+                completed_areas = memory.get("completed_focus_areas", [])
+                required_areas = memory.get("required_focus_areas", [])
                 
                 # Find an uncompleted required area
                 next_focus = None
@@ -273,11 +238,9 @@ class DeepThinkingChain:
                     print("✅ Moving to summarization due to planning error or completion...")
                 else:
                     continue_analysis = True
-                    self.memory["current_focus"] = next_focus
+                    current_focus = next_focus
+                    self.memory_manager.update_memory({"current_focus": next_focus})
                     print(f"🔄 Continuing with focus on {next_focus} (default decision due to error)")
-            
-            # Save memory after planning
-            self._save_memory()
         
         # Step 4: Summarization Agent - Generate final summary
         print("📋 Summarization Agent: Generating investment summary...")
@@ -291,10 +254,11 @@ class DeepThinkingChain:
                 f.write(summary)
             
             # Update memory with completion information
-            self.memory["completion_time"] = datetime.now().isoformat()
-            self.memory["completion_percentage"] = 100
-            self.memory["summary_file"] = summary_file
-            self._save_memory()
+            self.memory_manager.update_memory({
+                "completion_time": datetime.now().isoformat(),
+                "completion_percentage": 100,
+                "summary_file": summary_file
+            })
             
             print(f"🎉 Analysis complete! Summary saved to {summary_file}")
             return summary_file
@@ -328,6 +292,14 @@ class DeepThinkingChain:
             summary_file = f"results/{self.symbol}_basic_summary.md"
             with open(summary_file, 'w') as f:
                 f.write(basic_summary)
+            
+            # Update memory with error information
+            self.memory_manager.update_memory({
+                "completion_time": datetime.now().isoformat(),
+                "completion_percentage": 90,
+                "summary_file": summary_file,
+                "summary_error": str(e)
+            })
             
             print(f"⚠️ Error in summarization. Basic summary saved to {summary_file}")
             return summary_file

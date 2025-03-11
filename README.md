@@ -29,6 +29,14 @@ DeepThinkingChain is a lightweight multi-agent system designed to help investors
 - **PlanningAgent**: Decides whether to continue research or proceed to summarization
 - **SummarizationAgent**: Compiles and synthesizes analyses into a comprehensive investment summary
 
+### Memory Management
+
+- **MemoryManager**: Handles JSON-based persistence of analysis state across iterations
+  - Tracks analysis progress, focus areas, and completion percentage
+  - Stores iteration history and analysis results
+  - Provides methods for loading, updating, and saving memory
+  - Supports exporting memory for further analysis
+
 ### Prompts
 
 The system uses a set of prompt templates and functions to generate prompts for the various agents:
