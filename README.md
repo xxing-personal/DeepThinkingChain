@@ -63,6 +63,100 @@ chain.run()
      ```
 4. Run the orchestrator: `python orchestrator.py SYMBOL`
 
+## Step-by-Step Example
+
+Here's a complete example of how to analyze NVIDIA (NVDA) using DeepThinkingChain:
+
+### Prerequisites
+
+1. **Get API Keys**:
+   - Sign up for a free API key at [Financial Modeling Prep](https://financialmodelingprep.com/developer/docs/)
+   - Get an OpenAI API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+
+2. **Environment Setup**:
+   ```bash
+   # Clone the repository
+   git clone https://github.com/yourusername/DeepThinkingChain.git
+   cd DeepThinkingChain
+   
+   # Create and activate a virtual environment
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   
+   # Install dependencies
+   pip install -r requirements.txt
+   
+   # Create .env file with your API keys
+   echo "FMP_API_KEY=your_financial_modeling_prep_api_key" > .env
+   echo "OPENAI_API_KEY=your_openai_api_key" >> .env
+   ```
+
+### Running the Analysis
+
+3. **Run the Analysis**:
+   ```bash
+   # Run the analysis with default settings (5 iterations)
+   python orchestrator.py NVDA
+   
+   # Or specify a custom number of iterations
+   python orchestrator.py NVDA 3
+   ```
+
+4. **Monitor the Progress**:
+   - The system will display progress information for each iteration:
+     ```
+     🔍 Starting Deep Thinking Chain analysis for NVDA...
+     
+     📊 Iteration 1/3
+     🔧 Tool Agent: Fetching data for NVDA with focus on financial_performance...
+     🧠 Analysis Agent: Analyzing financial_performance data...
+     📊 Analysis complete: positive sentiment with high confidence
+     📈 Analysis progress: 33.3% complete
+     📝 Planning Agent: Determining next steps...
+     ```
+
+5. **Review the Results**:
+   ```bash
+   # View the generated summary
+   cat results/NVDA_summary.md
+   ```
+
+### Understanding the Output
+
+The final summary in `results/NVDA_summary.md` includes:
+
+- **Executive Summary**: Overall investment recommendation with key points
+- **Company Overview**: Business model and market position
+- **Financial Analysis**: Key metrics and financial health assessment
+- **Growth Prospects**: Future growth opportunities and projections
+- **Competitive Advantages**: Analysis of NVIDIA's moat and strengths
+- **Risk Factors**: Potential challenges and threats
+- **Valuation**: Fair value estimate and valuation metrics
+- **Investment Recommendation**: Final recommendation with rationale
+
+### Advanced Usage
+
+You can also use the DeepThinkingChain programmatically in your Python code:
+
+```python
+from orchestrator import DeepThinkingChain
+
+# Initialize with custom parameters
+chain = DeepThinkingChain(
+    symbol="NVDA",
+    max_iterations=4  # Set custom number of iterations
+)
+
+# Run the analysis
+summary_file = chain.run()
+
+# Process the results
+with open(summary_file, 'r') as f:
+    summary = f.read()
+    
+print(f"Analysis complete! Summary saved to {summary_file}")
+```
+
 ## Directory Structure
 
 ```
