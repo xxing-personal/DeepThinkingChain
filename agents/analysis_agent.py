@@ -33,11 +33,13 @@ class AnalysisAgent:
         Args:
             model: The OpenAI model to use for analysis. Defaults to "gpt-4o".
         """
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # First check if API key is in environment, then fall back to .env file
+        api_key = os.environ.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        self.client = OpenAI(api_key=api_key)
         self.model = model
         
         # Check if API key is available
-        if not os.getenv("OPENAI_API_KEY"):
+        if not api_key:
             print("Warning: OPENAI_API_KEY environment variable not found.")
             print("Please set your OpenAI API key as an environment variable.")
     
