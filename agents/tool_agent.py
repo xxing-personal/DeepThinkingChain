@@ -239,3 +239,94 @@ class ToolAgent:
         except Exception as e:
             print(f"Error fetching SEC filings for {symbol}: {str(e)}")
             return {"error": str(e)}
+
+
+if __name__ == "__main__":
+    """Test the ToolAgent functionality."""
+    import sys
+    import json
+    from pprint import pprint
+    
+    # Get symbol from command line or use default
+    symbol = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
+    
+    print(f"\n{'='*50}")
+    print(f"Testing ToolAgent with symbol: {symbol}")
+    print(f"{'='*50}\n")
+    
+    # Initialize the agent
+    agent = ToolAgent()
+    
+    # Test company profile
+    print(f"\n1. Fetching company profile for {symbol}...")
+    profile = agent.fetch_company_profile(symbol)
+    if "error" not in profile:
+        print(f"✅ Successfully fetched company profile")
+        print(f"Company: {profile.get('companyName')}")
+        print(f"Industry: {profile.get('industry')}")
+        print(f"Market Cap: ${profile.get('mktCap', 0):,.2f}")
+        print(f"Current Price: ${profile.get('price', 0):,.2f}")
+    else:
+        print(f"❌ Error: {profile.get('error')}")
+    
+    # Test financial ratios
+    print(f"\n2. Fetching financial ratios for {symbol}...")
+    ratios = agent.fetch_financial_ratios(symbol)
+    if "error" not in ratios:
+        print(f"✅ Successfully fetched financial ratios")
+        print(f"Date: {ratios.get('date')}")
+        print(f"ROE: {ratios.get('returnOnEquity', 0):.4f}")
+        print(f"ROA: {ratios.get('returnOnAssets', 0):.4f}")
+        print(f"P/E Ratio: {ratios.get('priceEarningsRatio', 0):.2f}")
+        print(f"Debt to Equity: {ratios.get('debtEquityRatio', 0):.2f}")
+    else:
+        print(f"❌ Error: {ratios.get('error')}")
+    
+    # Test focused data fetching
+    focus_areas = [
+        "financial_performance",
+        "competitive_analysis",
+        "growth_prospects",
+        "valuation",
+        "risk_assessment"
+    ]
+    
+    # Ask user which focus area to test
+    print("\n3. Test specific focus area data fetching")
+    print("Available focus areas:")
+    for i, area in enumerate(focus_areas, 1):
+        print(f"  {i}. {area}")
+    
+    try:
+        choice = input("\nEnter focus area number to test (or press Enter to skip): ")
+        if choice.strip():
+            idx = int(choice) - 1
+            if 0 <= idx < len(focus_areas):
+                focus = focus_areas[idx]
+                print(f"\nFetching {focus} data for {symbol}...")
+                data = agent.fetch_data(symbol, focus)
+                
+                # Check if we got data without errors
+                has_error = False
+                for key, value in data.items():
+                    if isinstance(value, dict) and "error" in value:
+                        has_error = True
+                        print(f"❌ Error in {key}: {value['error']}")
+                
+                if not has_error:
+                    print(f"✅ Successfully fetched {focus} data")
+                    print(f"Data contains the following sections:")
+                    for key in data.keys():
+                        print(f"  - {key}")
+                    
+                    # Ask if user wants to see detailed data
+                    show_details = input("\nShow detailed data? (y/n): ").lower().startswith('y')
+                    if show_details:
+                        print("\nDetailed data:")
+                        pprint(data)
+    except (ValueError, IndexError):
+        print("Invalid selection, skipping focus area test.")
+    
+    print(f"\n{'='*50}")
+    print(f"ToolAgent test complete")
+    print(f"{'='*50}\n")
