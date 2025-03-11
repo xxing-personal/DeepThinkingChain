@@ -29,6 +29,24 @@ DeepThinkingChain is a lightweight multi-agent system designed to help investors
 - **PlanningAgent**: Decides whether to continue research or proceed to summarization
 - **SummarizationAgent**: Compiles and synthesizes analyses into a comprehensive investment summary
 
+### Tools
+
+- **Tool**: Base class for all tools in the system
+- **ToolManager**: Manages and provides access to all available tools
+- **Financial Data Tools**: Tools for fetching financial data from external APIs
+  - Company profiles
+  - Financial ratios
+  - Income statements
+  - Balance sheets
+  - Cash flow statements
+- **Web Scraping Tools**: Tools for scraping web content
+  - Basic web scraping (HTML to markdown)
+  - Advanced scraping with JavaScript support (via ScrapingDog API)
+- **Web Search Tools**: Tools for searching the web
+  - Google Search (via ScrapingDog API)
+  - DuckDuckGo Search
+  - News Search
+
 ### Memory Management
 
 - **MemoryManager**: Handles JSON-based persistence of analysis state across iterations
@@ -68,6 +86,8 @@ chain.run()
      ```
      FMP_API_KEY=your_financial_modeling_prep_api_key
      OPENAI_API_KEY=your_openai_api_key
+     SCRAPING_DOG_API_KEY=your_scrapingdog_api_key  # For web scraping and Google search
+     NEWS_API_KEY=your_newsapi_key  # Optional, for news search
      ```
 4. Run the orchestrator: `python orchestrator.py SYMBOL`
 
@@ -97,6 +117,8 @@ Here's a complete example of how to analyze NVIDIA (NVDA) using DeepThinkingChai
    # Create .env file with your API keys
    echo "FMP_API_KEY=your_financial_modeling_prep_api_key" > .env
    echo "OPENAI_API_KEY=your_openai_api_key" >> .env
+   echo "SCRAPING_DOG_API_KEY=your_scrapingdog_api_key" >> .env
+   echo "NEWS_API_KEY=your_newsapi_key" >> .env
    ```
 
 ### Running the Analysis
@@ -170,6 +192,7 @@ print(f"Analysis complete! Summary saved to {summary_file}")
 ```
 deep-thinking-chain/
 ├── orchestrator.py
+├── memory.py
 ├── memory/
 │   └── [symbol]_memory.json
 ├── agents/
@@ -178,8 +201,18 @@ deep-thinking-chain/
 │   ├── analysis_agent.py
 │   ├── planning_agent.py
 │   └── summarization_agent.py
+├── tools/
+│   ├── __init__.py
+│   ├── tool.py
+│   ├── tool_manager.py
+│   ├── financial_data_tool.py
+│   ├── web_scraping_tool.py
+│   └── web_search_tool.py
 ├── prompts/
 │   └── analysis_prompts.py
+├── docs/
+│   ├── code_creation_history.md
+│   └── Creation_plan.md
 └── results/
     └── <symbol>_summary.md
 ```
