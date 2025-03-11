@@ -187,3 +187,46 @@ The test results show that the SummarizationAgent successfully:
 
 The SummarizationAgent completes the Deep Thinking Chain workflow, providing the final output that synthesizes all the research and analysis performed by the other agents.
 
+### Analysis Prompts Implementation
+
+1. **Core Functionality**:
+   - Implemented three key functions in `prompts/analysis_prompts.py` to generate different prompt templates:
+     - `initial_analysis_prompt(data, symbol)`: For the first analysis iteration
+     - `detailed_analysis_prompt(data, focus, symbol)`: For subsequent focused analyses
+     - `planning_prompt(analyses, symbol)`: For planning the next steps
+
+2. **Key Features**:
+   - **Dynamic Data Formatting**: Intelligently formats complex nested data structures (dictionaries, lists) into readable text
+   - **Template Selection**: Selects the appropriate template based on the analysis focus
+   - **Symbol Extraction**: Automatically extracts the stock symbol from data if not provided
+   - **Structured Output**: Creates well-organized prompts with clear sections and formatting
+
+3. **Templates**:
+   - Leverages existing templates in the module:
+     - `FINANCIAL_ANALYSIS_TEMPLATE`: For general financial analysis
+     - `COMPETITIVE_ANALYSIS_TEMPLATE`: For competitive positioning
+     - `GROWTH_ANALYSIS_TEMPLATE`: For growth prospects
+     - `RISK_ASSESSMENT_TEMPLATE`: For risk evaluation
+     - Custom planning template for the planning agent
+
+4. **Documentation**:
+   - Added detailed docstrings explaining the purpose, parameters, and return values of each function
+   - Included type hints for better code readability and IDE support
+   - Added comments explaining the data formatting logic
+
+5. **Testing Functionality**:
+   - Created a separate test script (`test_prompts.py`) that verifies all three functions
+   - Tests include sample data for realistic testing scenarios
+
+#### Test Results
+
+The test results show that the prompt functions successfully:
+
+1. Generate well-structured prompts for different analysis scenarios
+2. Properly format complex data structures into readable text
+3. Select the appropriate templates based on the focus area
+4. Handle the extraction of stock symbols from the data
+5. Create comprehensive planning prompts that include previous analysis results
+
+These prompt functions provide a standardized way to generate prompts for the various agents in the Deep Thinking Chain, ensuring consistency and clarity in the analysis process.
+

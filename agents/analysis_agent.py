@@ -12,13 +12,16 @@ import time
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Import prompt templates
+# Import prompt templates and functions
 from prompts.analysis_prompts import (
     FINANCIAL_ANALYSIS_TEMPLATE,
     COMPETITIVE_ANALYSIS_TEMPLATE,
     GROWTH_ANALYSIS_TEMPLATE,
     RISK_ASSESSMENT_TEMPLATE,
-    SUMMARY_TEMPLATE
+    SUMMARY_TEMPLATE,
+    initial_analysis_prompt,
+    detailed_analysis_prompt,
+    planning_prompt
 )
 
 # Load environment variables
@@ -73,14 +76,11 @@ class AnalysisAgent:
         Raises:
             Exception: If the OpenAI API call fails
         """
-        # Determine which template to use based on focus
-        template = self._select_template(focus)
-        
-        # Format the data for the prompt
-        formatted_data = self._format_data(data)
-        
-        # Create the prompt
-        prompt = template.format(symbol=symbol, data=formatted_data)
+        # Generate the appropriate prompt based on focus
+        if focus is None or focus == "financial_performance":
+            prompt = initial_analysis_prompt(data, symbol)
+        else:
+            prompt = detailed_analysis_prompt(data, focus, symbol)
         
         try:
             # Call OpenAI API
@@ -99,7 +99,7 @@ class AnalysisAgent:
             
             # Process the analysis to extract key points and sentiment
             key_points = self._extract_key_points(analysis_text)
-            sentiment, confidence = self._determine_sentiment(analysis_text)
+            sentiment_result = self._determine_sentiment(analysis_text)
             
             # Construct the result
             result = {
@@ -108,8 +108,8 @@ class AnalysisAgent:
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "insights": analysis_text,
                 "key_points": key_points,
-                "sentiment": sentiment,
-                "confidence": confidence,
+                "sentiment": sentiment_result["sentiment"],
+                "confidence": sentiment_result["confidence"],
                 "raw_data": data  # Include the original data for reference
             }
             
@@ -125,85 +125,6 @@ class AnalysisAgent:
                 "raw_data": data
             }
     
-    def _select_template(self, focus: Optional[str]) -> str:
-        """Select the appropriate template based on the focus area.
-        
-        Args:
-            focus: The focus area for the analysis
-            
-        Returns:
-            The template string to use
-        """
-        if focus == "competitive_analysis":
-            return COMPETITIVE_ANALYSIS_TEMPLATE
-        elif focus == "growth_prospects":
-            return GROWTH_ANALYSIS_TEMPLATE
-        elif focus == "risk_assessment":
-            return RISK_ASSESSMENT_TEMPLATE
-        else:
-            # Default to general financial analysis
-            return FINANCIAL_ANALYSIS_TEMPLATE
-    
-    def _format_data(self, data: Dict[str, Any]) -> str:
-        """Format the data for inclusion in the prompt.
-        
-        Args:
-            data: The data to format
-            
-        Returns:
-            A formatted string representation of the data
-        """
-        # For large data structures, we need to be selective about what we include
-        # to avoid exceeding token limits
-        formatted_parts = []
-        
-        for key, value in data.items():
-            if isinstance(value, dict) and "error" in value:
-                # Skip data with errors
-                continue
-                
-            # Format based on data type
-            if key == "company_profile":
-                formatted_parts.append(f"COMPANY PROFILE:\n{json.dumps(value, indent=2)}")
-            elif key == "financial_ratios":
-                formatted_parts.append(f"FINANCIAL RATIOS:\n{json.dumps(value, indent=2)}")
-            elif key == "income_statement":
-                # For large datasets, include only the most recent periods
-                if isinstance(value, list) and len(value) > 0:
-                    recent_data = value[:2]  # Most recent 2 periods
-                    formatted_parts.append(f"RECENT INCOME STATEMENTS:\n{json.dumps(recent_data, indent=2)}")
-            elif key == "balance_sheet":
-                if isinstance(value, list) and len(value) > 0:
-                    recent_data = value[:2]  # Most recent 2 periods
-                    formatted_parts.append(f"RECENT BALANCE SHEETS:\n{json.dumps(recent_data, indent=2)}")
-            elif key == "cash_flow":
-                if isinstance(value, list) and len(value) > 0:
-                    recent_data = value[:2]  # Most recent 2 periods
-                    formatted_parts.append(f"RECENT CASH FLOW STATEMENTS:\n{json.dumps(recent_data, indent=2)}")
-            elif key == "peers":
-                formatted_parts.append(f"PEER COMPANIES:\n{json.dumps(value, indent=2)}")
-            elif key == "peer_profiles":
-                formatted_parts.append(f"PEER PROFILES:\n{json.dumps(value, indent=2)}")
-            elif key == "growth_estimates":
-                formatted_parts.append(f"GROWTH ESTIMATES:\n{json.dumps(value, indent=2)}")
-            elif key == "analyst_recommendations":
-                formatted_parts.append(f"ANALYST RECOMMENDATIONS:\n{json.dumps(value, indent=2)}")
-            elif key == "key_metrics":
-                if isinstance(value, list) and len(value) > 0:
-                    recent_data = value[:2]  # Most recent 2 periods
-                    formatted_parts.append(f"KEY METRICS:\n{json.dumps(recent_data, indent=2)}")
-            elif key == "dcf":
-                formatted_parts.append(f"DCF VALUATION:\n{json.dumps(value, indent=2)}")
-            elif key == "sec_filings":
-                if isinstance(value, list) and len(value) > 0:
-                    recent_data = value[:5]  # Most recent 5 filings
-                    formatted_parts.append(f"RECENT SEC FILINGS:\n{json.dumps(recent_data, indent=2)}")
-            else:
-                # For other data types, include a summary
-                formatted_parts.append(f"{key.upper()}:\n{str(value)[:500]}...")
-        
-        return "\n\n".join(formatted_parts)
-    
     def _extract_key_points(self, analysis_text: str) -> List[str]:
         """Extract key points from the analysis text.
         
@@ -213,94 +134,69 @@ class AnalysisAgent:
         Returns:
             List of key points extracted from the analysis
         """
-        # In a more sophisticated implementation, we could use another LLM call
-        # to extract key points. For now, we'll use a simple heuristic approach.
-        
-        key_points = []
-        
-        # Split by newlines and look for bullet points or numbered items
-        lines = analysis_text.split('\n')
-        for line in lines:
-            line = line.strip()
-            # Check for bullet points, numbered lists, or lines starting with "Key"
-            if (line.startswith('-') or 
-                line.startswith('•') or 
-                (line.startswith(tuple('123456789')) and '. ' in line[:5]) or
-                line.lower().startswith('key')):
-                
-                # Clean up the line
-                clean_line = line
-                if line.startswith('-') or line.startswith('•'):
-                    clean_line = line[1:].strip()
-                elif line.startswith(tuple('123456789')) and '. ' in line[:5]:
-                    clean_line = line[line.find('.')+1:].strip()
-                
-                if clean_line and len(clean_line) > 10:  # Avoid very short points
-                    key_points.append(clean_line)
-        
-        # If we couldn't find any key points with the above method,
-        # just take the first few sentences
-        if not key_points:
-            sentences = analysis_text.split('.')
-            key_points = [s.strip() + '.' for s in sentences[:5] if len(s.strip()) > 20]
-        
-        # Limit to top 10 key points
-        return key_points[:10]
+        # Use OpenAI to extract key points
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "Extract the 5-7 most important key points from this financial analysis. Return ONLY a JSON array of strings with no explanation."},
+                    {"role": "user", "content": analysis_text}
+                ],
+                temperature=0.2,
+                max_tokens=1000,
+                response_format={"type": "json_object"}
+            )
+            
+            # Parse the response
+            content = response.choices[0].message.content
+            key_points = json.loads(content).get("key_points", [])
+            
+            # Ensure we have at least some key points
+            if not key_points:
+                # Fallback to simple extraction
+                key_points = [line.strip() for line in analysis_text.split("\n") 
+                             if line.strip().startswith("-") or line.strip().startswith("*")][:7]
+            
+            return key_points
+        except Exception as e:
+            print(f"Error extracting key points: {e}")
+            # Fallback to simple extraction
+            return [line.strip() for line in analysis_text.split("\n") 
+                   if line.strip().startswith("-") or line.strip().startswith("*")][:7]
     
-    def _determine_sentiment(self, analysis_text: str) -> tuple:
-        """Determine the overall sentiment and confidence from the analysis text.
+    def _determine_sentiment(self, analysis_text: str) -> Dict[str, str]:
+        """Determine the overall sentiment and confidence level from the analysis.
         
         Args:
             analysis_text: The full analysis text
             
         Returns:
-            Tuple of (sentiment, confidence) where:
-            - sentiment is one of "positive", "neutral", or "negative"
-            - confidence is one of "high", "medium", or "low"
+            Dict with sentiment and confidence keys
         """
-        # In a more sophisticated implementation, we could use another LLM call
-        # or a sentiment analysis model. For now, we'll use a simple keyword approach.
-        
-        # Positive keywords
-        positive_words = [
-            'growth', 'strong', 'opportunity', 'upside', 'outperform',
-            'buy', 'attractive', 'undervalued', 'recommend', 'positive',
-            'advantage', 'moat', 'leader', 'innovative', 'profitable'
-        ]
-        
-        # Negative keywords
-        negative_words = [
-            'risk', 'challenge', 'threat', 'decline', 'underperform',
-            'sell', 'overvalued', 'avoid', 'negative', 'weak',
-            'competition', 'pressure', 'concern', 'debt', 'uncertain'
-        ]
-        
-        # Count occurrences
-        positive_count = sum(analysis_text.lower().count(word) for word in positive_words)
-        negative_count = sum(analysis_text.lower().count(word) for word in negative_words)
-        
-        # Determine sentiment
-        if positive_count > negative_count * 1.5:
-            sentiment = "positive"
-        elif negative_count > positive_count * 1.5:
-            sentiment = "negative"
-        else:
-            sentiment = "neutral"
-        
-        # Determine confidence based on the difference
-        total_count = positive_count + negative_count
-        if total_count == 0:
-            confidence = "low"
-        else:
-            difference = abs(positive_count - negative_count) / total_count
-            if difference > 0.5:
-                confidence = "high"
-            elif difference > 0.2:
-                confidence = "medium"
-            else:
-                confidence = "low"
-        
-        return sentiment, confidence
+        # Use OpenAI to determine sentiment
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "Based on this financial analysis, determine the overall investment sentiment (positive, neutral, negative) and confidence level (high, medium, low). Return ONLY a JSON object with 'sentiment' and 'confidence' keys."},
+                    {"role": "user", "content": analysis_text}
+                ],
+                temperature=0.2,
+                max_tokens=100,
+                response_format={"type": "json_object"}
+            )
+            
+            # Parse the response
+            content = response.choices[0].message.content
+            result = json.loads(content)
+            
+            return {
+                "sentiment": result.get("sentiment", "neutral"),
+                "confidence": result.get("confidence", "medium")
+            }
+        except Exception as e:
+            print(f"Error determining sentiment: {e}")
+            return {"sentiment": "neutral", "confidence": "medium"}
     
     def summarize_analyses(self, analyses: List[Dict[str, Any]], symbol: str) -> str:
         """Generates a comprehensive final investment recommendation summary.
@@ -312,19 +208,8 @@ class AnalysisAgent:
         Returns:
             A comprehensive investment recommendation summary
         """
-        # Format the analyses for the prompt
-        formatted_analyses = json.dumps([
-            {
-                "analysis_type": a.get("analysis_type", "unknown"),
-                "insights": a.get("insights", ""),
-                "key_points": a.get("key_points", []),
-                "sentiment": a.get("sentiment", "neutral")
-            }
-            for a in analyses
-        ], indent=2)
-        
-        # Create the prompt using the summary template
-        prompt = SUMMARY_TEMPLATE.format(symbol=symbol, analyses=formatted_analyses)
+        # Generate the planning prompt using the new function
+        prompt = planning_prompt(analyses, symbol)
         
         try:
             # Call OpenAI API

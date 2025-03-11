@@ -1,6 +1,6 @@
 import os
 import requests
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Union
 import json
 from dotenv import load_dotenv
 
@@ -44,289 +44,419 @@ class ToolAgent:
         
         # Make the request
         url = f"{self.base_url}/{endpoint}"
-        response = requests.get(url, params=params)
         
-        # Check if request was successful
-        if response.status_code != 200:
-            raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
-        
-        # Parse and return the response
-        return response.json()
+        try:
+            response = requests.get(url, params=params)
+            
+            # Check if request was successful
+            if response.status_code != 200:
+                return {"error": f"API request failed with status code {response.status_code}"}
+            
+            # Parse response
+            data = response.json()
+            
+            # Check if data is empty
+            if not data:
+                return {"error": "No data returned from API"}
+            
+            return data
+        except Exception as e:
+            return {"error": str(e)}
     
     def fetch_company_profile(self, symbol: str) -> Dict[str, Any]:
         """Fetches basic company profile from financialmodelingprep API.
         
         Args:
-            symbol: Stock symbol (e.g., 'NVDA')
+            symbol: Stock symbol to fetch data for
             
         Returns:
-            Dict containing company profile information including:
-            - Company name, description, sector, industry
-            - Market capitalization, current price
-            - Basic financial metrics
+            Dict containing company profile data
         """
-        try:
-            endpoint = f"profile/{symbol}"
-            result = self._make_request(endpoint)
-            
-            # The API returns a list with a single item
-            if result and isinstance(result, list) and len(result) > 0:
-                return result[0]
-            return {}
-        except Exception as e:
-            print(f"Error fetching company profile for {symbol}: {str(e)}")
-            return {"error": str(e)}
+        endpoint = f"profile/{symbol}"
+        response = self._make_request(endpoint)
+        
+        # The API returns a list with a single item
+        if isinstance(response, list) and len(response) > 0:
+            return response[0]
+        elif "error" in response:
+            return response
+        else:
+            return {"error": "Unexpected response format"}
     
     def fetch_financial_ratios(self, symbol: str) -> Dict[str, Any]:
         """Retrieves financial ratios data for deeper financial insights.
         
         Args:
-            symbol: Stock symbol (e.g., 'NVDA')
+            symbol: Stock symbol to fetch data for
             
         Returns:
-            Dict containing key financial ratios including:
-            - Profitability ratios (ROE, ROA, profit margins)
-            - Liquidity ratios (current ratio, quick ratio)
-            - Solvency ratios (debt-to-equity, interest coverage)
-            - Valuation ratios (P/E, P/B, EV/EBITDA)
+            Dict containing financial ratios
         """
-        try:
-            endpoint = f"ratios/{symbol}"
-            result = self._make_request(endpoint)
-            
-            # The API returns a list of ratios by period
-            if result and isinstance(result, list) and len(result) > 0:
-                # Return the most recent period's ratios
-                return result[0]
-            return {}
-        except Exception as e:
-            print(f"Error fetching financial ratios for {symbol}: {str(e)}")
-            return {"error": str(e)}
+        endpoint = f"ratios/{symbol}"
+        response = self._make_request(endpoint)
+        
+        # The API returns a list of ratios for different periods
+        if isinstance(response, list) and len(response) > 0:
+            return response[0]  # Return the most recent period
+        elif "error" in response:
+            return response
+        else:
+            return {"error": "Unexpected response format"}
     
-    def fetch_data(self, symbol: str, focus: str) -> Dict[str, Any]:
-        """Fetches specific financial data based on the current analysis focus.
+    def fetch_income_statement(self, symbol: str, limit: int = 4, period: str = "annual") -> List[Dict[str, Any]]:
+        """Fetches income statement data for the company.
         
         Args:
-            symbol: Stock symbol (e.g., 'NVDA')
-            focus: The current analysis focus area (e.g., 'financial_performance', 
-                  'competitive_analysis', 'growth_prospects', etc.)
+            symbol: Stock symbol to fetch data for
+            limit: Number of periods to fetch (default: 4)
+            period: 'annual' or 'quarter' (default: 'annual')
+            
+        Returns:
+            List of income statements for different periods
+        """
+        endpoint = f"income-statement/{symbol}"
+        params = {"limit": limit, "period": period}
+        response = self._make_request(endpoint, params)
+        
+        if isinstance(response, list):
+            return response
+        elif "error" in response:
+            return [response]
+        else:
+            return [{"error": "Unexpected response format"}]
+    
+    def fetch_balance_sheet(self, symbol: str, limit: int = 4, period: str = "annual") -> List[Dict[str, Any]]:
+        """Fetches balance sheet data for the company.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            limit: Number of periods to fetch (default: 4)
+            period: 'annual' or 'quarter' (default: 'annual')
+            
+        Returns:
+            List of balance sheets for different periods
+        """
+        endpoint = f"balance-sheet-statement/{symbol}"
+        params = {"limit": limit, "period": period}
+        response = self._make_request(endpoint, params)
+        
+        if isinstance(response, list):
+            return response
+        elif "error" in response:
+            return [response]
+        else:
+            return [{"error": "Unexpected response format"}]
+    
+    def fetch_cash_flow(self, symbol: str, limit: int = 4, period: str = "annual") -> List[Dict[str, Any]]:
+        """Fetches cash flow statement data for the company.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            limit: Number of periods to fetch (default: 4)
+            period: 'annual' or 'quarter' (default: 'annual')
+            
+        Returns:
+            List of cash flow statements for different periods
+        """
+        endpoint = f"cash-flow-statement/{symbol}"
+        params = {"limit": limit, "period": period}
+        response = self._make_request(endpoint, params)
+        
+        if isinstance(response, list):
+            return response
+        elif "error" in response:
+            return [response]
+        else:
+            return [{"error": "Unexpected response format"}]
+    
+    def fetch_peers(self, symbol: str) -> List[str]:
+        """Fetches peer companies for the given symbol.
+        
+        Args:
+            symbol: Stock symbol to fetch peers for
+            
+        Returns:
+            List of peer company symbols
+        """
+        endpoint = f"stock_peers"
+        params = {"symbol": symbol}
+        response = self._make_request(endpoint, params)
+        
+        if isinstance(response, list) and len(response) > 0:
+            return response[0].get("peersList", [])
+        elif "error" in response:
+            return [response["error"]]
+        else:
+            return ["Error: Unexpected response format"]
+    
+    def fetch_peer_ratios(self, symbol: str) -> Dict[str, Any]:
+        """Fetches financial ratios for the company and its peers.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            
+        Returns:
+            Dict containing financial ratios for the company and its peers
+        """
+        # First get the peers
+        peers = self.fetch_peers(symbol)
+        
+        # If there was an error fetching peers
+        if len(peers) == 1 and peers[0].startswith("Error"):
+            return {"error": peers[0]}
+        
+        # Limit to top 5 peers
+        peers = peers[:5]
+        
+        # Add the original symbol
+        symbols = [symbol] + peers
+        
+        # Fetch ratios for all symbols
+        result = {"symbol": symbol, "peers": {}}
+        
+        for sym in symbols:
+            if sym == symbol:
+                result["ratios"] = self.fetch_financial_ratios(sym)
+            else:
+                result["peers"][sym] = self.fetch_financial_ratios(sym)
+        
+        return result
+    
+    def fetch_market_share(self, symbol: str) -> Dict[str, Any]:
+        """Fetches market share data for the company.
+        
+        Note: This is a simulated method as FMP doesn't provide direct market share data.
+        In a real implementation, this would use a different data source or calculate
+        market share based on revenue and industry size.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            
+        Returns:
+            Dict containing market share data
+        """
+        # Get company profile to determine industry
+        profile = self.fetch_company_profile(symbol)
+        
+        if "error" in profile:
+            return profile
+        
+        industry = profile.get("industry", "Unknown")
+        
+        # This is simulated data - in a real implementation, this would come from a data source
+        return {
+            "symbol": symbol,
+            "industry": industry,
+            "market_share_percentage": 0.15,  # Simulated value
+            "industry_rank": 3,  # Simulated value
+            "top_competitors": self.fetch_peers(symbol)[:3],
+            "note": "This is simulated market share data for demonstration purposes."
+        }
+    
+    def fetch_growth_estimates(self, symbol: str) -> Dict[str, Any]:
+        """Fetches growth estimates for the company.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            
+        Returns:
+            Dict containing growth estimates
+        """
+        endpoint = f"analyst-estimates/{symbol}"
+        params = {"period": "annual"}
+        response = self._make_request(endpoint, params)
+        
+        if isinstance(response, list) and len(response) > 0:
+            return {
+                "symbol": symbol,
+                "estimates": response
+            }
+        elif "error" in response:
+            return response
+        else:
+            return {"error": "Unexpected response format"}
+    
+    def fetch_analyst_recommendations(self, symbol: str) -> Dict[str, Any]:
+        """Fetches analyst recommendations for the company.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            
+        Returns:
+            Dict containing analyst recommendations
+        """
+        endpoint = f"analyst-stock-recommendations/{symbol}"
+        response = self._make_request(endpoint)
+        
+        if isinstance(response, list):
+            return {
+                "symbol": symbol,
+                "recommendations": response
+            }
+        elif "error" in response:
+            return response
+        else:
+            return {"error": "Unexpected response format"}
+    
+    def fetch_earnings_surprises(self, symbol: str) -> Dict[str, Any]:
+        """Fetches earnings surprises for the company.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            
+        Returns:
+            Dict containing earnings surprises
+        """
+        endpoint = f"earnings-surprises/{symbol}"
+        response = self._make_request(endpoint)
+        
+        if isinstance(response, list):
+            return {
+                "symbol": symbol,
+                "earnings_surprises": response
+            }
+        elif "error" in response:
+            return response
+        else:
+            return {"error": "Unexpected response format"}
+    
+    def fetch_sec_filings(self, symbol: str, limit: int = 10) -> Dict[str, Any]:
+        """Fetches SEC filings for the company.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            limit: Number of filings to fetch (default: 10)
+            
+        Returns:
+            Dict containing SEC filings
+        """
+        endpoint = f"sec_filings/{symbol}"
+        params = {"limit": limit}
+        response = self._make_request(endpoint, params)
+        
+        if isinstance(response, list):
+            return {
+                "symbol": symbol,
+                "filings": response
+            }
+        elif "error" in response:
+            return response
+        else:
+            return {"error": "Unexpected response format"}
+    
+    def fetch_price_volatility(self, symbol: str) -> Dict[str, Any]:
+        """Fetches price volatility data for the company.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            
+        Returns:
+            Dict containing price volatility data
+        """
+        # Get historical price data
+        endpoint = f"historical-price-full/{symbol}"
+        params = {"timeseries": 365}  # Last year of data
+        response = self._make_request(endpoint, params)
+        
+        if "historical" not in response:
+            if "error" in response:
+                return response
+            else:
+                return {"error": "Unexpected response format"}
+        
+        # Calculate volatility (standard deviation of daily returns)
+        historical_data = response["historical"]
+        
+        if len(historical_data) < 30:
+            return {"error": "Insufficient historical data to calculate volatility"}
+        
+        # Calculate daily returns
+        daily_returns = []
+        for i in range(1, len(historical_data)):
+            today = historical_data[i]["close"]
+            yesterday = historical_data[i-1]["close"]
+            daily_return = (today - yesterday) / yesterday
+            daily_returns.append(daily_return)
+        
+        # Calculate volatility (standard deviation of returns)
+        import numpy as np
+        volatility = np.std(daily_returns)
+        annualized_volatility = volatility * np.sqrt(252)  # Annualize (252 trading days)
+        
+        return {
+            "symbol": symbol,
+            "daily_volatility": float(volatility),
+            "annualized_volatility": float(annualized_volatility),
+            "data_period": f"{historical_data[-1]['date']} to {historical_data[0]['date']}",
+            "sample_size": len(historical_data)
+        }
+    
+    def fetch_data(self, symbol: str, focus: str) -> Dict[str, Any]:
+        """Fetches financial data based on the current analysis focus.
+        
+        Args:
+            symbol: Stock symbol to fetch data for
+            focus: The focus area for the analysis
             
         Returns:
             Dict containing the requested financial data
         """
-        data = {}
+        # Add symbol to the result
+        result = {"symbol": symbol}
         
-        # Fetch different data based on the focus area
+        # Always include company profile
+        result["company_profile"] = self.fetch_company_profile(symbol)
+        
+        # Fetch data based on focus
         if focus == "financial_performance":
-            data["income_statement"] = self._fetch_income_statement(symbol)
-            data["balance_sheet"] = self._fetch_balance_sheet(symbol)
-            data["cash_flow"] = self._fetch_cash_flow(symbol)
-            
+            result["financial_ratios"] = self.fetch_financial_ratios(symbol)
+            result["income_statement"] = self.fetch_income_statement(symbol, limit=2)
+            result["balance_sheet"] = self.fetch_balance_sheet(symbol, limit=2)
+            result["cash_flow"] = self.fetch_cash_flow(symbol, limit=2)
+        
         elif focus == "competitive_analysis":
-            data["peers"] = self._fetch_peers(symbol)
-            # Get sector performance for comparison
-            if data.get("peers"):
-                sector_data = {}
-                for peer in data["peers"][:3]:  # Limit to top 3 peers
-                    sector_data[peer] = self.fetch_company_profile(peer)
-                data["peer_profiles"] = sector_data
-                
+            result["peers"] = self.fetch_peers(symbol)
+            result["peer_ratios"] = self.fetch_peer_ratios(symbol)
+            result["market_share"] = self.fetch_market_share(symbol)
+        
         elif focus == "growth_prospects":
-            data["growth_estimates"] = self._fetch_growth_estimates(symbol)
-            data["analyst_recommendations"] = self._fetch_analyst_recommendations(symbol)
-            
-        elif focus == "valuation":
-            data["key_metrics"] = self._fetch_key_metrics(symbol)
-            data["dcf"] = self._fetch_dcf_valuation(symbol)
-            
+            result["growth_estimates"] = self.fetch_growth_estimates(symbol)
+            result["analyst_recommendations"] = self.fetch_analyst_recommendations(symbol)
+            result["earnings_surprises"] = self.fetch_earnings_surprises(symbol)
+        
         elif focus == "risk_assessment":
-            data["sec_filings"] = self._fetch_sec_filings(symbol)
-            
+            result["financial_ratios"] = self.fetch_financial_ratios(symbol)
+            result["sec_filings"] = self.fetch_sec_filings(symbol, limit=5)
+            result["price_volatility"] = self.fetch_price_volatility(symbol)
+        
         else:
-            # Default: fetch general company information
-            data["company_profile"] = self.fetch_company_profile(symbol)
-            data["financial_ratios"] = self.fetch_financial_ratios(symbol)
-            
-        return data
-    
-    def _fetch_income_statement(self, symbol: str) -> Dict[str, Any]:
-        """Fetches income statement data."""
-        try:
-            endpoint = f"income-statement/{symbol}"
-            params = {"limit": 4}  # Last 4 periods
-            return self._make_request(endpoint, params)
-        except Exception as e:
-            print(f"Error fetching income statement for {symbol}: {str(e)}")
-            return {"error": str(e)}
-    
-    def _fetch_balance_sheet(self, symbol: str) -> Dict[str, Any]:
-        """Fetches balance sheet data."""
-        try:
-            endpoint = f"balance-sheet-statement/{symbol}"
-            params = {"limit": 4}  # Last 4 periods
-            return self._make_request(endpoint, params)
-        except Exception as e:
-            print(f"Error fetching balance sheet for {symbol}: {str(e)}")
-            return {"error": str(e)}
-    
-    def _fetch_cash_flow(self, symbol: str) -> Dict[str, Any]:
-        """Fetches cash flow statement data."""
-        try:
-            endpoint = f"cash-flow-statement/{symbol}"
-            params = {"limit": 4}  # Last 4 periods
-            return self._make_request(endpoint, params)
-        except Exception as e:
-            print(f"Error fetching cash flow statement for {symbol}: {str(e)}")
-            return {"error": str(e)}
-    
-    def _fetch_peers(self, symbol: str) -> list:
-        """Fetches company peers/competitors."""
-        try:
-            endpoint = f"stock_peers"
-            params = {"symbol": symbol}
-            result = self._make_request(endpoint, params)
-            if result and isinstance(result, list) and len(result) > 0:
-                return result[0].get("peersList", [])
-            return []
-        except Exception as e:
-            print(f"Error fetching peers for {symbol}: {str(e)}")
-            return []
-    
-    def _fetch_growth_estimates(self, symbol: str) -> Dict[str, Any]:
-        """Fetches growth estimates."""
-        try:
-            endpoint = f"analyst-estimates/{symbol}"
-            params = {"period": "annual"}
-            return self._make_request(endpoint, params)
-        except Exception as e:
-            print(f"Error fetching growth estimates for {symbol}: {str(e)}")
-            return {"error": str(e)}
-    
-    def _fetch_analyst_recommendations(self, symbol: str) -> Dict[str, Any]:
-        """Fetches analyst recommendations."""
-        try:
-            endpoint = f"analyst-stock-recommendations/{symbol}"
-            return self._make_request(endpoint)
-        except Exception as e:
-            print(f"Error fetching analyst recommendations for {symbol}: {str(e)}")
-            return {"error": str(e)}
-    
-    def _fetch_key_metrics(self, symbol: str) -> Dict[str, Any]:
-        """Fetches key metrics."""
-        try:
-            endpoint = f"key-metrics/{symbol}"
-            params = {"limit": 4}  # Last 4 periods
-            return self._make_request(endpoint, params)
-        except Exception as e:
-            print(f"Error fetching key metrics for {symbol}: {str(e)}")
-            return {"error": str(e)}
-    
-    def _fetch_dcf_valuation(self, symbol: str) -> Dict[str, Any]:
-        """Fetches discounted cash flow valuation."""
-        try:
-            endpoint = f"discounted-cash-flow/{symbol}"
-            return self._make_request(endpoint)
-        except Exception as e:
-            print(f"Error fetching DCF valuation for {symbol}: {str(e)}")
-            return {"error": str(e)}
-    
-    def _fetch_sec_filings(self, symbol: str) -> Dict[str, Any]:
-        """Fetches recent SEC filings."""
-        try:
-            endpoint = f"sec_filings/{symbol}"
-            params = {"limit": 10}  # Last 10 filings
-            return self._make_request(endpoint, params)
-        except Exception as e:
-            print(f"Error fetching SEC filings for {symbol}: {str(e)}")
-            return {"error": str(e)}
+            # Default: fetch basic financial data
+            result["financial_ratios"] = self.fetch_financial_ratios(symbol)
+        
+        return result
 
 
 if __name__ == "__main__":
-    """Test the ToolAgent functionality."""
     import sys
-    import json
-    from pprint import pprint
     
-    # Get symbol from command line or use default
+    # Get symbol from command line argument or use default
     symbol = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
-    
-    print(f"\n{'='*50}")
-    print(f"Testing ToolAgent with symbol: {symbol}")
-    print(f"{'='*50}\n")
     
     # Initialize the agent
     agent = ToolAgent()
     
     # Test company profile
-    print(f"\n1. Fetching company profile for {symbol}...")
+    print(f"\nFetching company profile for {symbol}...")
     profile = agent.fetch_company_profile(symbol)
-    if "error" not in profile:
-        print(f"✅ Successfully fetched company profile")
-        print(f"Company: {profile.get('companyName')}")
-        print(f"Industry: {profile.get('industry')}")
-        print(f"Market Cap: ${profile.get('mktCap', 0):,.2f}")
-        print(f"Current Price: ${profile.get('price', 0):,.2f}")
-    else:
-        print(f"❌ Error: {profile.get('error')}")
+    print(json.dumps(profile, indent=2))
     
     # Test financial ratios
-    print(f"\n2. Fetching financial ratios for {symbol}...")
+    print(f"\nFetching financial ratios for {symbol}...")
     ratios = agent.fetch_financial_ratios(symbol)
-    if "error" not in ratios:
-        print(f"✅ Successfully fetched financial ratios")
-        print(f"Date: {ratios.get('date')}")
-        print(f"ROE: {ratios.get('returnOnEquity', 0):.4f}")
-        print(f"ROA: {ratios.get('returnOnAssets', 0):.4f}")
-        print(f"P/E Ratio: {ratios.get('priceEarningsRatio', 0):.2f}")
-        print(f"Debt to Equity: {ratios.get('debtEquityRatio', 0):.2f}")
-    else:
-        print(f"❌ Error: {ratios.get('error')}")
+    print(json.dumps(ratios, indent=2))
     
-    # Test focused data fetching
-    focus_areas = [
-        "financial_performance",
-        "competitive_analysis",
-        "growth_prospects",
-        "valuation",
-        "risk_assessment"
-    ]
-    
-    # Ask user which focus area to test
-    print("\n3. Test specific focus area data fetching")
-    print("Available focus areas:")
-    for i, area in enumerate(focus_areas, 1):
-        print(f"  {i}. {area}")
-    
-    try:
-        choice = input("\nEnter focus area number to test (or press Enter to skip): ")
-        if choice.strip():
-            idx = int(choice) - 1
-            if 0 <= idx < len(focus_areas):
-                focus = focus_areas[idx]
-                print(f"\nFetching {focus} data for {symbol}...")
-                data = agent.fetch_data(symbol, focus)
-                
-                # Check if we got data without errors
-                has_error = False
-                for key, value in data.items():
-                    if isinstance(value, dict) and "error" in value:
-                        has_error = True
-                        print(f"❌ Error in {key}: {value['error']}")
-                
-                if not has_error:
-                    print(f"✅ Successfully fetched {focus} data")
-                    print(f"Data contains the following sections:")
-                    for key in data.keys():
-                        print(f"  - {key}")
-                    
-                    # Ask if user wants to see detailed data
-                    show_details = input("\nShow detailed data? (y/n): ").lower().startswith('y')
-                    if show_details:
-                        print("\nDetailed data:")
-                        pprint(data)
-    except (ValueError, IndexError):
-        print("Invalid selection, skipping focus area test.")
-    
-    print(f"\n{'='*50}")
-    print(f"ToolAgent test complete")
-    print(f"{'='*50}\n")
+    # Test data fetching with focus
+    focus = sys.argv[2] if len(sys.argv) > 2 else "financial_performance"
+    print(f"\nFetching data for {symbol} with focus on {focus}...")
+    data = agent.fetch_data(symbol, focus)
+    print(f"Data keys: {list(data.keys())}")

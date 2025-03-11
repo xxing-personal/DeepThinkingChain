@@ -1,157 +1,130 @@
 """
-Test script for the AnalysisAgent.
-
-This script tests the AnalysisAgent's ability to analyze financial data
-and generate investment insights using the OpenAI API.
+Test script for the AnalysisAgent with the new prompt functions.
 """
 
 import os
-import json
 from dotenv import load_dotenv
 from agents.analysis_agent import AnalysisAgent
-from agents.tool_agent import ToolAgent
 
 # Load environment variables
 load_dotenv()
 
-def test_with_sample_data():
-    """Test the AnalysisAgent with sample data."""
-    # Sample data for testing
-    sample_data = {
-        "company_profile": {
-            "symbol": "AAPL",
-            "companyName": "Apple Inc.",
-            "industry": "Consumer Electronics",
-            "sector": "Technology",
-            "description": "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide.",
-            "mktCap": 3000000000000,
-            "price": 200.0
-        },
-        "financial_ratios": {
-            "peRatio": 30.5,
-            "returnOnEquity": 1.5,
-            "returnOnAssets": 0.25,
-            "debtEquityRatio": 1.8
-        }
-    }
+def test_analysis_agent():
+    """Test the AnalysisAgent with the new prompt functions."""
+    # Check if OpenAI API key is available
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("Warning: OPENAI_API_KEY environment variable not found.")
+        print("Please set your OpenAI API key to run this test.")
+        return
     
     # Initialize the agent
     agent = AnalysisAgent()
     
-    # Test the analyze method
-    print("\n" + "="*50)
-    print("Testing AnalysisAgent with sample data...")
-    print("="*50 + "\n")
-    
-    result = agent.analyze(sample_data, symbol="AAPL")
-    
-    print(f"Analysis Type: {result['analysis_type']}")
-    print(f"Symbol: {result['symbol']}")
-    print(f"Timestamp: {result['timestamp']}")
-    print(f"Sentiment: {result.get('sentiment', 'N/A')}")
-    print(f"Confidence: {result.get('confidence', 'N/A')}")
-    
-    if "error" in result:
-        print(f"\nError: {result['error']}")
-        return
-    
-    print("\nKey Points:")
-    for i, point in enumerate(result.get('key_points', []), 1):
-        print(f"{i}. {point}")
-    
-    print("\nInsights Preview:")
-    insights = result.get('insights', '')
-    print(insights[:500] + "..." if len(insights) > 500 else insights)
-    
-    print("\n" + "="*50)
-    print("AnalysisAgent test with sample data complete")
-    print("="*50)
-
-def test_with_real_data(symbol="AAPL"):
-    """Test the AnalysisAgent with real data from the ToolAgent."""
-    print("\n" + "="*50)
-    print(f"Testing AnalysisAgent with real data for {symbol}...")
-    print("="*50 + "\n")
-    
-    # Check if FMP API key is set
-    if not os.getenv("FMP_API_KEY"):
-        print("Error: FMP_API_KEY environment variable not found.")
-        return
-    
-    # Initialize the agents
-    tool_agent = ToolAgent()
-    analysis_agent = AnalysisAgent()
-    
-    # Fetch real data
-    print(f"Fetching data for {symbol}...")
-    data = {
-        "company_profile": tool_agent.fetch_company_profile(symbol),
-        "financial_ratios": tool_agent.fetch_financial_ratios(symbol)
+    # Sample data for testing
+    sample_data = {
+        "company_profile": {
+            "symbol": "AAPL",
+            "name": "Apple Inc.",
+            "sector": "Technology",
+            "industry": "Consumer Electronics",
+            "description": "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide.",
+            "market_cap": 2800000000000,
+            "price": 175.50
+        },
+        "financial_ratios": {
+            "pe_ratio": 28.5,
+            "price_to_sales": 7.2,
+            "debt_to_equity": 1.5,
+            "current_ratio": 1.2,
+            "gross_margin": 0.43,
+            "operating_margin": 0.30,
+            "net_margin": 0.25
+        }
     }
     
-    # Check if data was fetched successfully
-    if "error" in data["company_profile"] or "error" in data["financial_ratios"]:
-        print("Error fetching data. Please check your API key and try again.")
-        return
+    # Test initial analysis
+    print("Testing initial analysis...")
+    result = agent.analyze(sample_data, symbol="AAPL")
     
-    print("Data fetched successfully.")
-    
-    # Analyze the data
-    print("Analyzing data...")
-    result = analysis_agent.analyze(data, symbol=symbol)
-    
-    if "error" in result:
-        print(f"\nError during analysis: {result['error']}")
-        return
-    
+    # Print the results
     print(f"Analysis Type: {result['analysis_type']}")
     print(f"Symbol: {result['symbol']}")
-    print(f"Timestamp: {result['timestamp']}")
-    print(f"Sentiment: {result.get('sentiment', 'N/A')}")
-    print(f"Confidence: {result.get('confidence', 'N/A')}")
-    
+    print(f"Sentiment: {result['sentiment']}")
+    print(f"Confidence: {result['confidence']}")
     print("\nKey Points:")
-    for i, point in enumerate(result.get('key_points', []), 1):
-        print(f"{i}. {point}")
+    for point in result["key_points"]:
+        print(f"- {point}")
     
     print("\nInsights Preview:")
-    insights = result.get('insights', '')
-    print(insights[:500] + "..." if len(insights) > 500 else insights)
+    print(result["insights"][:500] + "...")
     
-    # Save the full analysis to a file
-    output_dir = "results"
-    os.makedirs(output_dir, exist_ok=True)
-    output_file = f"{output_dir}/{symbol}_analysis.md"
+    # Test detailed analysis with a specific focus
+    print("\n\nTesting detailed analysis (competitive)...")
+    sample_data_competitive = {
+        "symbol": "AAPL",
+        "competitors": [
+            {"symbol": "MSFT", "name": "Microsoft Corporation", "market_cap": 2500000000000},
+            {"symbol": "GOOG", "name": "Alphabet Inc.", "market_cap": 1800000000000},
+            {"symbol": "AMZN", "name": "Amazon.com Inc.", "market_cap": 1600000000000}
+        ],
+        "market_share": {
+            "smartphones": 0.18,
+            "tablets": 0.32,
+            "wearables": 0.35
+        }
+    }
     
-    with open(output_file, "w") as f:
-        f.write(f"# Investment Analysis for {symbol}\n\n")
-        f.write(f"## {result['analysis_type'].replace('_', ' ').title()} Analysis\n\n")
-        f.write(insights)
+    result = agent.analyze(sample_data_competitive, focus="competitive_analysis", symbol="AAPL")
     
-    print(f"\nFull analysis saved to {output_file}")
+    # Print the results
+    print(f"Analysis Type: {result['analysis_type']}")
+    print(f"Symbol: {result['symbol']}")
+    print(f"Sentiment: {result['sentiment']}")
+    print(f"Confidence: {result['confidence']}")
+    print("\nKey Points:")
+    for point in result["key_points"]:
+        print(f"- {point}")
     
-    print("\n" + "="*50)
-    print("AnalysisAgent test with real data complete")
-    print("="*50)
+    print("\nInsights Preview:")
+    print(result["insights"][:500] + "...")
+    
+    # Test planning with multiple analyses
+    print("\n\nTesting planning with multiple analyses...")
+    analyses = [
+        {
+            "analysis_type": "general_financial",
+            "symbol": "AAPL",
+            "insights": "Apple shows strong financial performance with consistent revenue growth and high margins. The company has a robust balance sheet with significant cash reserves.",
+            "key_points": [
+                "Revenue growth of 12% year-over-year",
+                "Gross margin of 43%, above industry average",
+                "Strong cash position of $200B",
+                "Consistent share repurchases and dividend growth"
+            ],
+            "sentiment": "positive",
+            "confidence": "high"
+        },
+        {
+            "analysis_type": "competitive_analysis",
+            "symbol": "AAPL",
+            "insights": "Apple maintains a strong competitive position in its core markets. The company's ecosystem and brand loyalty provide significant advantages over competitors.",
+            "key_points": [
+                "Leading market share in premium smartphones",
+                "Strong ecosystem lock-in effects",
+                "Brand value provides pricing power",
+                "Facing increasing competition in services"
+            ],
+            "sentiment": "positive",
+            "confidence": "medium"
+        }
+    ]
+    
+    summary = agent.summarize_analyses(analyses, symbol="AAPL")
+    
+    # Print the summary
+    print("\nSummary Preview:")
+    print(summary[:500] + "...")
 
 if __name__ == "__main__":
-    import sys
-    
-    # Check if OpenAI API key is set
-    api_key = os.environ.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if not api_key or api_key == "your_openai_api_key_here":
-        print("Error: OPENAI_API_KEY environment variable not set or using default value.")
-        print("Please set your OpenAI API key in the .env file or environment.")
-        sys.exit(1)
-    
-    # Determine which test to run
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "sample":
-            test_with_sample_data()
-        else:
-            # Assume the argument is a stock symbol
-            test_with_real_data(sys.argv[1])
-    else:
-        # Run both tests with default symbol
-        test_with_sample_data()
-        test_with_real_data() 
+    test_analysis_agent() 

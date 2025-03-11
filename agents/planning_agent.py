@@ -52,6 +52,9 @@ class PlanningAgent:
     
     def plan_next(self, analysis_result: Dict[str, Any], 
                   iteration: int = 1, 
+                  max_iterations: int = 5,
+                  completed_focus_areas: Optional[List[str]] = None,
+                  required_focus_areas: Optional[List[str]] = None,
                   previous_analyses: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Determines the next iteration's actions or signals summarization.
         
@@ -60,7 +63,7 @@ class PlanningAgent:
         2. Move to the summarization phase if sufficient information has been gathered
         
         The decision is based on several factors:
-        - Current iteration number
+        - Current iteration number and maximum allowed iterations
         - Coverage of key focus areas
         - Confidence level of existing analyses
         - Identified gaps or areas needing further investigation
@@ -68,6 +71,9 @@ class PlanningAgent:
         Args:
             analysis_result: The most recent analysis result from the AnalysisAgent
             iteration: Current iteration number (starting from 1)
+            max_iterations: Maximum number of iterations allowed
+            completed_focus_areas: List of focus areas that have been analyzed
+            required_focus_areas: List of focus areas that must be covered
             previous_analyses: List of analysis results from previous iterations
                               (excluding the current one)
             

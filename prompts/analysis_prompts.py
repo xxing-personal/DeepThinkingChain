@@ -194,3 +194,166 @@ Provide a balanced perspective that acknowledges both bullish and bearish argume
 ANALYSES:
 {analyses}
 """
+
+# New functions to generate different prompt templates
+
+def initial_analysis_prompt(data: dict, symbol: str = None) -> str:
+    """
+    Generate a prompt for initial financial analysis of a company.
+    
+    This function creates a prompt for the first analysis iteration, focusing on
+    general financial performance and business overview.
+    
+    Args:
+        data (dict): Financial data for the company to be analyzed
+        symbol (str, optional): The stock symbol of the company. If None, will try to extract from data.
+        
+    Returns:
+        str: Formatted prompt for initial analysis
+    """
+    if symbol is None and 'symbol' in data:
+        symbol = data.get('symbol')
+    elif symbol is None:
+        symbol = "the company"
+    
+    # Format the data for the prompt
+    formatted_data = ""
+    for key, value in data.items():
+        if isinstance(value, dict):
+            formatted_data += f"\n## {key.replace('_', ' ').title()}\n"
+            for sub_key, sub_value in value.items():
+                formatted_data += f"{sub_key}: {sub_value}\n"
+        elif isinstance(value, list):
+            formatted_data += f"\n## {key.replace('_', ' ').title()}\n"
+            for item in value:
+                if isinstance(item, dict):
+                    formatted_data += "\n"
+                    for item_key, item_value in item.items():
+                        formatted_data += f"{item_key}: {item_value}\n"
+                else:
+                    formatted_data += f"- {item}\n"
+        else:
+            formatted_data += f"{key}: {value}\n"
+    
+    return FINANCIAL_ANALYSIS_TEMPLATE.format(symbol=symbol, data=formatted_data)
+
+def detailed_analysis_prompt(data: dict, focus: str, symbol: str = None) -> str:
+    """
+    Generate a prompt for detailed analysis with a specific focus.
+    
+    This function creates a prompt for subsequent analysis iterations, focusing on
+    specific aspects like competitive analysis, growth prospects, or risk assessment.
+    
+    Args:
+        data (dict): Financial data for the company to be analyzed
+        focus (str): The focus area for analysis ('competitive', 'growth', 'risk')
+        symbol (str, optional): The stock symbol of the company. If None, will try to extract from data.
+        
+    Returns:
+        str: Formatted prompt for detailed analysis
+    """
+    if symbol is None and 'symbol' in data:
+        symbol = data.get('symbol')
+    elif symbol is None:
+        symbol = "the company"
+    
+    # Format the data for the prompt
+    formatted_data = ""
+    for key, value in data.items():
+        if isinstance(value, dict):
+            formatted_data += f"\n## {key.replace('_', ' ').title()}\n"
+            for sub_key, sub_value in value.items():
+                formatted_data += f"{sub_key}: {sub_value}\n"
+        elif isinstance(value, list):
+            formatted_data += f"\n## {key.replace('_', ' ').title()}\n"
+            for item in value:
+                if isinstance(item, dict):
+                    formatted_data += "\n"
+                    for item_key, item_value in item.items():
+                        formatted_data += f"{item_key}: {item_value}\n"
+                else:
+                    formatted_data += f"- {item}\n"
+        else:
+            formatted_data += f"{key}: {value}\n"
+    
+    # Select the appropriate template based on the focus
+    if focus.lower() == 'competitive':
+        template = COMPETITIVE_ANALYSIS_TEMPLATE
+    elif focus.lower() == 'growth':
+        template = GROWTH_ANALYSIS_TEMPLATE
+    elif focus.lower() == 'risk':
+        template = RISK_ASSESSMENT_TEMPLATE
+    else:
+        # Default to financial analysis if focus is not recognized
+        template = FINANCIAL_ANALYSIS_TEMPLATE
+    
+    return template.format(symbol=symbol, data=formatted_data)
+
+def planning_prompt(analyses: list, symbol: str = None) -> str:
+    """
+    Generate a prompt for planning the next steps in the analysis process.
+    
+    This function creates a prompt for the planning agent to determine whether
+    to continue with further analysis or proceed to summarization.
+    
+    Args:
+        analyses (list): List of previous analysis results
+        symbol (str, optional): The stock symbol of the company
+        
+    Returns:
+        str: Formatted prompt for planning
+    """
+    if symbol is None and analyses and 'symbol' in analyses[0]:
+        symbol = analyses[0].get('symbol')
+    elif symbol is None:
+        symbol = "the company"
+    
+    # Format the analyses for the prompt
+    formatted_analyses = ""
+    for i, analysis in enumerate(analyses):
+        formatted_analyses += f"\n## Analysis {i+1}: {analysis.get('analysis_type', 'General')}\n"
+        
+        # Add key insights
+        if 'insights' in analysis:
+            formatted_analyses += "\nKey Insights:\n"
+            formatted_analyses += analysis['insights']
+        
+        # Add key points if available
+        if 'key_points' in analysis and analysis['key_points']:
+            formatted_analyses += "\n\nKey Points:\n"
+            for point in analysis['key_points']:
+                formatted_analyses += f"- {point}\n"
+        
+        # Add sentiment and confidence
+        if 'sentiment' in analysis:
+            formatted_analyses += f"\nSentiment: {analysis.get('sentiment', 'Neutral')}\n"
+        if 'confidence' in analysis:
+            formatted_analyses += f"Confidence: {analysis.get('confidence', 'Medium')}\n"
+        
+        formatted_analyses += "\n" + "-"*50 + "\n"
+    
+    planning_template = """
+You are a research coordinator tasked with planning the next steps for analyzing {symbol} as an investment opportunity.
+Based on the analyses conducted so far, determine whether:
+
+1. Further analysis is needed (and what specific focus area)
+2. The research is sufficient to proceed to final summarization
+
+Consider the following factors:
+- Have all key aspects been covered? (financial performance, competitive position, growth prospects, risks)
+- Are there any areas with low confidence or contradictory findings that need further investigation?
+- Is there sufficient information to make an investment recommendation?
+
+Provide your decision with clear reasoning and specify the next focus area if further analysis is needed.
+
+ANALYSES CONDUCTED SO FAR:
+{analyses}
+
+Your response should be structured as:
+1. Assessment of current research completeness (%)
+2. Decision: Continue Research or Proceed to Summarization
+3. If continuing, specify the next focus area and justify
+4. If proceeding to summarization, explain why the research is sufficient
+"""
+    
+    return planning_template.format(symbol=symbol, analyses=formatted_analyses)
