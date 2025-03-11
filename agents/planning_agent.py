@@ -89,33 +89,48 @@ class PlanningAgent:
         if previous_analyses is None:
             previous_analyses = []
         
+        # Initialize completed_focus_areas if None
+        if completed_focus_areas is None:
+            completed_focus_areas = []
+        
+        # Initialize required_focus_areas if None
+        if required_focus_areas is None:
+            required_focus_areas = self.completion_criteria["required_focus_areas"]
+        
         # Combine current and previous analyses
         all_analyses = previous_analyses + [analysis_result]
         
         # Extract key information for decision making
-        covered_focus_areas = [a.get("analysis_type") for a in all_analyses if "analysis_type" in a]
         current_focus = analysis_result.get("analysis_type", "general_financial")
         confidence = analysis_result.get("confidence", "medium")
         confidence_score = self._confidence_to_score(confidence)
         sentiment = analysis_result.get("sentiment", "neutral")
         
+        # Check if we've reached the maximum iterations
+        max_iterations_reached = iteration >= max_iterations
+        
         # Check if we've covered the minimum required iterations
         min_iterations_met = iteration >= self.completion_criteria["min_iterations"]
         
         # Check if we've covered all required focus areas
-        required_areas_covered = all(area in covered_focus_areas 
-                                    for area in self.completion_criteria["required_focus_areas"])
+        required_areas_covered = all(area in completed_focus_areas for area in required_focus_areas)
         
         # Check if confidence is high enough
         confidence_met = confidence_score >= self.completion_criteria["confidence_threshold"]
         
         # Calculate completion percentage
         completion_percentage = self._calculate_completion_percentage(
-            iteration, covered_focus_areas, confidence_score
+            iteration, max_iterations, completed_focus_areas, required_focus_areas, confidence_score
         )
         
         # Determine if we should continue or summarize
-        if not min_iterations_met or not required_areas_covered:
+        if max_iterations_reached:
+            # Stop if we've reached the maximum iterations
+            continue_analysis = False
+            next_focus = None
+            reasoning = f"Maximum iterations ({max_iterations}) reached. Moving to summarization."
+        
+        elif not min_iterations_met or not required_areas_covered:
             # Continue analysis if minimum criteria not met
             continue_analysis = True
             reasoning = f"Continuing analysis because "
@@ -124,17 +139,17 @@ class PlanningAgent:
                 reasoning += f"minimum iterations ({self.completion_criteria['min_iterations']}) not reached. "
             
             if not required_areas_covered:
-                missing_areas = [area for area in self.completion_criteria["required_focus_areas"] 
-                                if area not in covered_focus_areas]
+                missing_areas = [area for area in required_focus_areas 
+                                if area not in completed_focus_areas]
                 reasoning += f"required focus areas not covered: {', '.join(missing_areas)}. "
             
             # Determine next focus area
-            next_focus = self._determine_next_focus(covered_focus_areas, analysis_result)
+            next_focus = self._determine_next_focus(completed_focus_areas, required_focus_areas, analysis_result)
             
         elif self._should_explore_further(analysis_result, all_analyses):
             # Continue analysis if there are areas that need further exploration
             continue_analysis = True
-            next_focus = self._determine_next_focus(covered_focus_areas, analysis_result)
+            next_focus = self._determine_next_focus(completed_focus_areas, required_focus_areas, analysis_result)
             reasoning = f"Continuing analysis to explore {next_focus} based on current findings. "
             
         else:
@@ -160,7 +175,7 @@ class PlanningAgent:
             "completion_percentage": completion_percentage,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "iteration": iteration,
-            "covered_focus_areas": covered_focus_areas
+            "covered_focus_areas": completed_focus_areas
         }
         
         return result
@@ -183,24 +198,28 @@ class PlanningAgent:
     
     def _calculate_completion_percentage(self, 
                                         iteration: int, 
-                                        covered_focus_areas: List[str],
+                                        max_iterations: int,
+                                        completed_focus_areas: List[str],
+                                        required_focus_areas: List[str],
                                         confidence_score: float) -> int:
         """Calculate the estimated completion percentage of the research.
         
         Args:
             iteration: Current iteration number
-            covered_focus_areas: List of focus areas already covered
+            max_iterations: Maximum number of iterations allowed
+            completed_focus_areas: List of focus areas already covered
+            required_focus_areas: List of focus areas that must be covered
             confidence_score: Numerical confidence score
             
         Returns:
             Completion percentage (0-100)
         """
         # Base percentage on iterations (up to 30%)
-        iteration_factor = min(iteration / self.completion_criteria["min_iterations"], 1.0) * 30
+        iteration_factor = min(iteration / max_iterations, 1.0) * 30
         
         # Focus areas coverage (up to 50%)
-        required_areas = self.completion_criteria["required_focus_areas"]
-        covered_required = sum(1 for area in required_areas if area in covered_focus_areas)
+        required_areas = required_focus_areas
+        covered_required = sum(1 for area in required_areas if area in completed_focus_areas)
         focus_factor = (covered_required / len(required_areas)) * 50
         
         # Confidence factor (up to 20%)
@@ -211,31 +230,33 @@ class PlanningAgent:
         return min(round(total), 100)
     
     def _determine_next_focus(self, 
-                             covered_focus_areas: List[str],
+                             completed_focus_areas: List[str],
+                             required_focus_areas: List[str],
                              analysis_result: Dict[str, Any]) -> str:
         """Determine the next focus area for research.
         
         Args:
-            covered_focus_areas: List of focus areas already covered
+            completed_focus_areas: List of focus areas already covered
+            required_focus_areas: List of focus areas that must be covered
             analysis_result: The most recent analysis result
             
         Returns:
             Next focus area to research
         """
         # First, prioritize required areas that haven't been covered
-        for area in self.completion_criteria["required_focus_areas"]:
-            if area not in covered_focus_areas:
+        for area in required_focus_areas:
+            if area not in completed_focus_areas:
                 return area
         
         # Then, look for any focus area not yet covered
         for area in self.focus_areas:
-            if area not in covered_focus_areas:
+            if area not in completed_focus_areas:
                 return area
         
         # If all areas covered, use LLM to determine which area needs more depth
         try:
             # Create a prompt for the LLM
-            prompt = self._create_next_focus_prompt(covered_focus_areas, analysis_result)
+            prompt = self._create_next_focus_prompt(completed_focus_areas, required_focus_areas, analysis_result)
             
             # Call OpenAI API
             response = self.client.chat.completions.create(
@@ -265,12 +286,14 @@ class PlanningAgent:
             return "financial_performance"
     
     def _create_next_focus_prompt(self, 
-                                 covered_focus_areas: List[str],
+                                 completed_focus_areas: List[str],
+                                 required_focus_areas: List[str],
                                  analysis_result: Dict[str, Any]) -> str:
         """Create a prompt for determining the next focus area.
         
         Args:
-            covered_focus_areas: List of focus areas already covered
+            completed_focus_areas: List of focus areas already covered
+            required_focus_areas: List of focus areas that must be covered
             analysis_result: The most recent analysis result
             
         Returns:
@@ -284,7 +307,7 @@ Based on the current investment analysis for {analysis_result.get('symbol', 'the
 I need to determine which area requires further research.
 
 We have already covered the following focus areas:
-{', '.join(covered_focus_areas)}
+{', '.join(completed_focus_areas)}
 
 The most recent analysis had the following key points:
 {key_points_text}
