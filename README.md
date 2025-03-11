@@ -46,6 +46,11 @@ DeepThinkingChain is a lightweight multi-agent system designed to help investors
   - Google Search (via ScrapingDog API)
   - DuckDuckGo Search
   - News Search
+- **Code Execution Tool**: Tool for securely executing Python code snippets
+  - Secure sandboxed environment
+  - Import whitelisting
+  - Execution timeouts
+  - AST-based security checks
 
 ### Memory Management
 
@@ -207,12 +212,19 @@ deep-thinking-chain/
 │   ├── tool_manager.py
 │   ├── financial_data_tool.py
 │   ├── web_scraping_tool.py
-│   └── web_search_tool.py
+│   ├── web_search_tool.py
+│   └── code_execution_tool.py
+├── sandbox/
+│   ├── __init__.py
+│   └── secure_executor.py
 ├── prompts/
 │   └── analysis_prompts.py
 ├── docs/
 │   ├── code_creation_history.md
-│   └── Creation_plan.md
+│   ├── Creation_plan.md
+│   ├── tools.md
+│   └── code_execution_tool.md
+├── test_code_execution.py
 └── results/
     └── <symbol>_summary.md
 ```

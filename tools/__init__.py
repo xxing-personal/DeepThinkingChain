@@ -41,6 +41,12 @@ try:
 except ImportError:
     pass
 
+# Import code execution tools
+try:
+    from tools.code_execution_tool import CodeExecutionTool
+except ImportError:
+    pass
+
 __all__ = [
     'Tool',
     'ToolManager',
@@ -53,5 +59,6 @@ __all__ = [
     'WebSearchTool',
     'GoogleSearchTool',
     'DuckDuckGoSearchTool',
-    'NewsSearchTool'
+    'NewsSearchTool',
+    'CodeExecutionTool'
 ] 
