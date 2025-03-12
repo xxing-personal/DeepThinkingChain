@@ -1,6 +1,8 @@
 """
 Tools package for DeepThinkingChain.
 
+This package contains various tools used by the DeepThinkingChain agents.
+
 This package contains the Tool base class and ToolManager for managing tools in the DeepThinkingChain project.
 
 Note: For web scraping and Google search functionality, a ScrapingDog API key is recommended.
