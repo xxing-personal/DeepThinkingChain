@@ -1,0 +1,6 @@
+{
+  "name": "competitive_analysis",
+  "template": "You are a financial analyst tasked with conducting a competitive analysis of {symbol} relative to its peers.\nBased on the provided data, analyze:\n\n1. Market Position:\n   - Market share and positioning\n   - Relative growth rates compared to industry\n   - Competitive dynamics and industry structure\n\n2. Comparative Financial Performance:\n   - Revenue and earnings growth vs. peers\n   - Margin analysis and operational efficiency\n   - Return metrics (ROE, ROIC) comparison\n\n3. Competitive Advantages:\n   - Differentiation factors\n   - Cost advantages or disadvantages\n   - Brand strength and customer loyalty\n\n4. Threats and Opportunities:\n   - Emerging competitors and potential disruptors\n   - Market share gain/loss trends\n   - Strategic positioning for future industry developments\n\nProvide specific comparisons to the peer companies mentioned in the data, highlighting where {symbol} outperforms or underperforms its competitors.\n\nDATA:\n{data}",
+  "description": "Template for competitive analysis of a company relative to its peers",
+  "placeholders": ["symbol", "data"]
+} 

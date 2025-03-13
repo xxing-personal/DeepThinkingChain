@@ -12,16 +12,12 @@ import time
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Import prompt templates and functions
+# Import prompt functions from the new template system
 from prompts.analysis_prompts import (
-    FINANCIAL_ANALYSIS_TEMPLATE,
-    COMPETITIVE_ANALYSIS_TEMPLATE,
-    GROWTH_ANALYSIS_TEMPLATE,
-    RISK_ASSESSMENT_TEMPLATE,
-    SUMMARY_TEMPLATE,
     initial_analysis_prompt,
     detailed_analysis_prompt,
-    planning_prompt
+    planning_prompt,
+    summary_prompt
 )
 
 # Import the Model class
@@ -41,17 +37,9 @@ class AnalysisAgent:
         """
         # Initialize the Model class
         self.model = Model(model=model_name)
-        
-        # For backward compatibility, also initialize OpenAI client
-        api_key = os.environ.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-        self.client = OpenAI(api_key=api_key)
         self.model_name = model_name
+        self.client = OpenAI()
         
-        # Check if API key is available
-        if not api_key:
-            print("Warning: OPENAI_API_KEY environment variable not found.")
-            print("Please set your OpenAI API key as an environment variable.")
-    
     def analyze(self, data: Dict[str, Any], focus: Optional[str] = None, symbol: str = "") -> Dict[str, Any]:
         """Analyzes financial data to identify key insights and investment factors.
         
@@ -324,40 +312,8 @@ class AnalysisAgent:
         Returns:
             str: A comprehensive investment summary in markdown format
         """
-        # Prepare the prompt with all analyses
-        analyses_text = ""
-        for i, analysis in enumerate(analyses, 1):
-            focus = analysis.get("focus", analysis.get("analysis_type", "general"))
-            insights = analysis.get("insights", analysis.get("analysis", ""))
-            sentiment = analysis.get("sentiment", "neutral")
-            confidence = analysis.get("confidence", "medium")
-            
-            analyses_text += f"\n\n## Analysis {i}: {focus.replace('_', ' ').title()}\n"
-            analyses_text += f"Sentiment: {sentiment}, Confidence: {confidence}\n\n"
-            analyses_text += insights[:2000]  # Limit length to avoid token limits
-            analyses_text += "\n\n---"
-        
-        # Create the prompt
-        prompt = f"""
-        # Investment Summary for {symbol}
-        
-        Based on the following analyses, create a comprehensive investment summary for {symbol}.
-        
-        {analyses_text}
-        
-        Please provide a well-structured investment summary in markdown format with the following sections:
-        
-        1. Executive Summary (brief overview and recommendation)
-        2. Company Overview (business model, market position)
-        3. Financial Analysis (key metrics, financial health)
-        4. Growth Prospects (future growth opportunities)
-        5. Competitive Advantages (moat, strengths)
-        6. Risk Factors (challenges, threats)
-        7. Valuation (fair value estimate, valuation metrics)
-        8. Investment Recommendation (final recommendation with rationale)
-        
-        Include specific data points from the analyses to support your conclusions.
-        """
+        # Use the summary_prompt function from the template system
+        prompt = summary_prompt(analyses, symbol)
         
         try:
             # Use the Model class to generate the summary

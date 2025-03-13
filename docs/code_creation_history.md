@@ -351,3 +351,54 @@ Simplified tool registration: We only need to register one tool instead of 17 se
 Easier maintenance: Changes to the base functionality only need to be made in one place.
 More flexible: Adding new financial data types is as simple as adding a new method and updating the DATA_TYPES dictionary.
 Better organization: All financial data functionality is now contained within a single class, making it easier to understand and modify.
+
+## Prompt Template System Implementation
+
+### PromptTemplate and PromptManager Classes
+
+1. **Core Functionality**:
+   - Created a `PromptTemplate` class that represents a single prompt template with placeholders
+   - Implemented a `PromptManager` class that manages collections of prompt templates
+   - Added functionality to load templates from JSON files and save templates to files
+
+2. **Key Features**:
+   - **Placeholder Detection**: Automatically extracts placeholders from template strings using regex
+   - **Template Validation**: Validates that all required placeholders are provided before formatting
+   - **JSON Storage**: Templates can be stored in and loaded from JSON files for easy management
+   - **Dynamic Formatting**: Easy formatting of templates with variable values
+   - **Error Handling**: Clear error messages when required placeholders are missing
+   - **Template Collections**: Manage multiple templates with a single manager
+
+3. **Implementation Details**:
+   - **PromptTemplate Class**:
+     - Stores template name, string, description, and extracted placeholders
+     - Provides methods to format templates, validate values, and get missing placeholders
+     - Includes helper methods for string representation and placeholder extraction
+   - **PromptManager Class**:
+     - Manages a dictionary of templates indexed by name
+     - Provides methods to add, get, and remove templates
+     - Includes functionality to load templates from JSON files in a directory
+     - Supports saving templates to JSON files for persistence
+
+4. **Documentation**:
+   - Added detailed docstrings explaining the purpose, parameters, and return values of each method
+   - Included type hints for better code readability and IDE support
+   - Created a comprehensive README.md with usage examples and explanations
+   - Added example script demonstrating various use cases
+
+5. **Example Templates**:
+   - Created example templates for stock analysis and market summaries
+   - Stored templates in JSON format with name, template string, description, and placeholders
+   - Demonstrated loading and using these templates in the example script
+
+### Integration with DeepThinkingChain
+
+The prompt template system is designed to be used throughout the DeepThinkingChain project:
+
+1. **Standardized Prompt Generation**: Provides a consistent way to generate prompts for all agents
+2. **Centralized Template Management**: Templates can be modified without changing code
+3. **Dynamic Content**: Allows for dynamic content based on analysis context
+4. **Validation**: Ensures all required placeholders are provided before sending prompts
+5. **Extensibility**: Easy to add new templates for different analysis scenarios
+
+The system supports the existing analysis prompts implementation and provides a foundation for future prompt generation needs across the project.

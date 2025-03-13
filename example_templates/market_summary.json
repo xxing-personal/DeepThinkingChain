@@ -1,0 +1,10 @@
+{
+  "name": "market_summary",
+  "template": "Provide a summary of the {market} market for {date}, highlighting {highlight_count} key events.",
+  "description": "Template for market summary prompts",
+  "placeholders": [
+    "market",
+    "date",
+    "highlight_count"
+  ]
+}

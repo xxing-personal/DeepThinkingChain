@@ -1,0 +1,6 @@
+{
+  "name": "stock_analysis",
+  "template": "Analyze the stock {symbol} focusing on {focus_area}. Consider the following factors: {factors}. Provide a {detail_level} analysis with supporting data from {time_period}.",
+  "description": "Template for comprehensive stock analysis prompts",
+  "placeholders": ["symbol", "focus_area", "factors", "detail_level", "time_period"]
+} 

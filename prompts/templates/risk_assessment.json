@@ -1,0 +1,6 @@
+{
+  "name": "risk_assessment",
+  "template": "You are a financial analyst tasked with conducting a risk assessment of {symbol} as an investment.\nBased on the provided data, analyze:\n\n1. Financial Risks:\n   - Debt levels and maturity profile\n   - Liquidity position and cash burn rate\n   - Currency and interest rate exposure\n\n2. Business and Operational Risks:\n   - Customer concentration\n   - Supply chain vulnerabilities\n   - Operational dependencies and bottlenecks\n\n3. Market Risks:\n   - Cyclicality and economic sensitivity\n   - Competitive threats and market share erosion\n   - Pricing pressure and margin compression\n\n4. Regulatory and Legal Risks:\n   - Current and potential regulatory challenges\n   - Litigation and legal proceedings\n   - Compliance requirements and associated costs\n\n5. Technological Risks:\n   - Disruption potential\n   - Technology obsolescence\n   - Cybersecurity and data privacy concerns\n\n6. ESG Risks:\n   - Environmental impact and sustainability concerns\n   - Social responsibility and labor practices\n   - Governance structure and shareholder rights\n\nProvide a comprehensive risk assessment with probability and potential impact estimates where possible.\n\nDATA:\n{data}",
+  "description": "Template for conducting a risk assessment of a company as an investment",
+  "placeholders": ["symbol", "data"]
+} 
