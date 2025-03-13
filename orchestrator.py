@@ -17,7 +17,8 @@ from memory import MemoryManager
 from prompts.analysis_prompts import (
     initial_analysis_prompt,
     detailed_analysis_prompt,
-    planning_prompt
+    planning_prompt,
+    summary_prompt
 )
 
 class DeepThinkingChain:
@@ -91,42 +92,45 @@ class DeepThinkingChain:
                     # First iteration or financial focus: get company profile and basic financials
                     data = {
                         "symbol": self.symbol,
-                        "company_profile": self.tool_agent.fetch_company_profile(self.symbol),
-                        "financial_ratios": self.tool_agent.fetch_financial_ratios(self.symbol),
-                        "income_statement": self.tool_agent.fetch_income_statement(self.symbol, limit=2),
-                        "balance_sheet": self.tool_agent.fetch_balance_sheet(self.symbol, limit=2),
-                        "cash_flow": self.tool_agent.fetch_cash_flow(self.symbol, limit=2)
+                        "company_profile": self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol),
+                        "financial_ratios": self.tool_agent.execute_tool("fetch_financial_ratios", symbol=self.symbol),
+                        "income_statement": self.tool_agent.execute_tool("fetch_income_statement", symbol=self.symbol, limit=2),
+                        "balance_sheet": self.tool_agent.execute_tool("fetch_balance_sheet", symbol=self.symbol, limit=2),
+                        "cash_flow": self.tool_agent.execute_tool("fetch_cash_flow", symbol=self.symbol, limit=2)
                     }
                 elif current_focus == "competitive_analysis":
                     # Competitive analysis: get peer companies and comparison data
                     data = {
                         "symbol": self.symbol,
-                        "company_profile": self.tool_agent.fetch_company_profile(self.symbol),
-                        "peers": self.tool_agent.fetch_peers(self.symbol),
-                        "peer_ratios": self.tool_agent.fetch_peer_ratios(self.symbol),
-                        "market_share": self.tool_agent.fetch_market_share(self.symbol)
+                        "company_profile": self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol),
+                        "peers": self.tool_agent.execute_tool("fetch_peers", symbol=self.symbol),
+                        "peer_ratios": self.tool_agent.execute_tool("fetch_peer_ratios", symbol=self.symbol),
+                        "market_share": self.tool_agent.execute_tool("fetch_market_share", symbol=self.symbol)
                     }
                 elif current_focus == "growth_prospects":
                     # Growth analysis: get growth estimates and future projections
                     data = {
                         "symbol": self.symbol,
-                        "company_profile": self.tool_agent.fetch_company_profile(self.symbol),
-                        "growth_estimates": self.tool_agent.fetch_growth_estimates(self.symbol),
-                        "analyst_recommendations": self.tool_agent.fetch_analyst_recommendations(self.symbol),
-                        "earnings_surprises": self.tool_agent.fetch_earnings_surprises(self.symbol)
+                        "company_profile": self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol),
+                        "growth_estimates": self.tool_agent.execute_tool("fetch_growth_estimates", symbol=self.symbol),
+                        "analyst_recommendations": self.tool_agent.execute_tool("fetch_analyst_recommendations", symbol=self.symbol),
+                        "earnings_surprises": self.tool_agent.execute_tool("fetch_earnings_surprises", symbol=self.symbol)
                     }
                 elif current_focus == "risk_assessment":
                     # Risk assessment: get volatility, debt, and risk factors
                     data = {
                         "symbol": self.symbol,
-                        "company_profile": self.tool_agent.fetch_company_profile(self.symbol),
-                        "financial_ratios": self.tool_agent.fetch_financial_ratios(self.symbol),
-                        "sec_filings": self.tool_agent.fetch_sec_filings(self.symbol, limit=5),
-                        "price_volatility": self.tool_agent.fetch_price_volatility(self.symbol)
+                        "company_profile": self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol),
+                        "financial_ratios": self.tool_agent.execute_tool("fetch_financial_ratios", symbol=self.symbol),
+                        "sec_filings": self.tool_agent.execute_tool("fetch_sec_filings", symbol=self.symbol, limit=5),
+                        "price_volatility": self.tool_agent.execute_tool("fetch_price_volatility", symbol=self.symbol)
                     }
                 else:
                     # Default: get data based on planning agent's focus
-                    data = self.tool_agent.fetch_data(self.symbol, current_focus)
+                    data = {"symbol": self.symbol}
+                    # Use execute_tool for each data type needed for this focus
+                    data["company_profile"] = self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol)
+                    # Add more data types as needed based on the focus
                 
                 # Check for errors in the data
                 if any("error" in str(value) for key, value in data.items() if key != "symbol"):
