@@ -1,6 +1,0 @@
-{
-  "name": "planning_template",
-  "template": "You are a research coordinator tasked with planning the next steps for analyzing {symbol} as an investment opportunity.\nBased on the analyses conducted so far, determine whether:\n\n1. Further analysis is needed (and what specific focus area)\n2. The research is sufficient to proceed to final summarization\n\nConsider the following factors:\n- Have all key aspects been covered? (financial performance, competitive position, growth prospects, risks)\n- Are there any areas with low confidence or contradictory findings that need further investigation?\n- Is there sufficient information to make an investment recommendation?\n\nProvide your decision with clear reasoning and specify the next focus area if further analysis is needed.\n\nANALYSES CONDUCTED SO FAR:\n{analyses}\n\nYour response should be structured as:\n1. Assessment of current research completeness (%)\n2. Decision: Continue Research or Proceed to Summarization\n3. If continuing, specify the next focus area and justify\n4. If proceeding to summarization, explain why the research is sufficient",
-  "description": "Template for planning the next steps in the analysis process",
-  "placeholders": ["symbol", "analyses"]
-} 

@@ -1,6 +1,0 @@
-{
-  "name": "market_summary",
-  "template": "Provide a summary of the {market} market for {date}, highlighting {highlight_count} key events. Focus on {sector} sector and include {metric_type} metrics.",
-  "description": "Template for market summary prompts with customizable focus",
-  "placeholders": ["market", "date", "highlight_count", "sector", "metric_type"]
-} 

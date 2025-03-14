@@ -1,6 +1,0 @@
-{
-  "name": "growth_analysis",
-  "template": "You are a financial analyst tasked with evaluating the growth prospects of {symbol}.\nBased on the provided data, analyze:\n\n1. Historical Growth Patterns:\n   - Revenue, earnings, and cash flow growth rates\n   - Organic vs. acquisition-driven growth\n   - Geographic and product segment growth breakdown\n\n2. Growth Drivers:\n   - Market expansion opportunities\n   - New product/service development\n   - Pricing power and volume growth potential\n\n3. Investment in Future Growth:\n   - R&D spending and innovation pipeline\n   - Capital expenditures and capacity expansion\n   - Strategic acquisitions and partnerships\n\n4. Growth Sustainability:\n   - Addressable market size and penetration rates\n   - Competitive intensity and market share trends\n   - Regulatory or technological factors affecting growth\n\n5. Growth Projections:\n   - Analyst consensus estimates\n   - Management guidance\n   - Realistic growth scenarios (base, bull, bear cases)\n\nProvide a balanced assessment of the company's growth potential, supported by specific data points.\n\nDATA:\n{data}",
-  "description": "Template for evaluating the growth prospects of a company",
-  "placeholders": ["symbol", "data"]
-} 

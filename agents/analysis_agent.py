@@ -7,17 +7,16 @@ financial data and extracting investment insights using the OpenAI API.
 
 import json
 import os
+import re
 from typing import Dict, Any, Optional, List, Union
 import time
-from openai import OpenAI
 from dotenv import load_dotenv
 
-# Import prompt functions from the new template system
-from prompts.analysis_prompts import (
-    initial_analysis_prompt,
-    detailed_analysis_prompt,
-    planning_prompt,
-    summary_prompt
+# Import the prompt manager and helper functions
+from prompts.prompt_manager import PromptManager
+from prompts.prompt_helper import (
+    format_data_for_prompt,
+    format_analyses_for_prompt
 )
 
 # Import the Model class
@@ -25,6 +24,10 @@ from model import Model
 
 # Load environment variables
 load_dotenv()
+
+# Initialize the prompt manager
+TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompts", "templates")
+prompt_manager = PromptManager(TEMPLATES_DIR)
 
 class AnalysisAgent:
     """Agent performing detailed analysis and extraction of insights from raw financial data."""
@@ -38,7 +41,6 @@ class AnalysisAgent:
         # Initialize the Model class
         self.model = Model(model=model_name)
         self.model_name = model_name
-        self.client = OpenAI()
         
     def analyze(self, data: Dict[str, Any], focus: Optional[str] = None, symbol: str = "") -> Dict[str, Any]:
         """Analyzes financial data to identify key insights and investment factors.
@@ -70,60 +72,167 @@ class AnalysisAgent:
         Raises:
             Exception: If the model API call fails
         """
-        # Generate the appropriate prompt based on focus
-        if focus is None or focus == "financial_performance":
-            prompt = initial_analysis_prompt(data, symbol)
-        else:
-            prompt = detailed_analysis_prompt(data, focus, symbol)
+        # Format the data for the prompt
+        formatted_data = format_data_for_prompt(data)
+        
+        # Set up the context and questions based on focus
+        context = f"You are analyzing financial data for {symbol}. " + \
+                 f"Focus on {focus if focus else 'general financial performance'}."
+        
+        questions = [
+            "What are the key financial strengths and weaknesses?",
+            "What is the overall investment sentiment (positive, neutral, negative)?",
+            "What is the confidence level in this analysis (high, medium, low)?",
+            "What are the most important factors for investors to consider?"
+        ]
+        
+        if focus == "financial_performance":
+            questions.append("How has the company performed financially in recent periods?")
+            questions.append("What are the key financial ratios and what do they indicate?")
+        elif focus == "competitive_analysis":
+            questions.append("How does the company compare to its competitors?")
+            questions.append("What competitive advantages or disadvantages does the company have?")
+        elif focus == "growth_prospects":
+            questions.append("What are the company's growth prospects?")
+            questions.append("What factors could drive or hinder future growth?")
+        elif focus == "risk_assessment":
+            questions.append("What are the key risks facing the company?")
+            questions.append("How might these risks impact investment returns?")
+        
+        # Format questions as a numbered list
+        formatted_questions = "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions)])
         
         try:
-            # Use the Model class to analyze the data
-            analysis_result = self.model.analyze_financial_data(
-                data=data,
-                focus=focus,
-                symbol=symbol
+            # Use the generic_analysis template
+            template = prompt_manager.get_template("generic_analysis")
+            if not template:
+                raise ValueError("Generic analysis template not found")
+            
+            # Format the template with our values
+            prompt = template.format(
+                overall_goal=f"To provide a comprehensive {focus if focus else 'financial'} analysis of {symbol}",
+                context=context,
+                last_step_result=formatted_data,
+                questions=formatted_questions
             )
             
-            # Extract the analysis text
-            analysis_text = analysis_result["analysis"]
+            # Use the Model class to analyze the data
+            response = self.model.generate(
+                prompt=prompt,
+                temperature=0.2,
+                max_tokens=4000
+            )
             
-            # Process the analysis to extract key points and sentiment
-            key_points = analysis_result["key_points"]
-            sentiment = analysis_result["sentiment"]
-            confidence = analysis_result["confidence"]
-            
-            # Construct the result
-            result = {
-                "analysis_type": focus if focus else "general_financial",
-                "symbol": symbol,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "insights": analysis_text,
-                "key_points": key_points,
-                "sentiment": sentiment,
-                "confidence": confidence,
-                "raw_data": data  # Include the original data for reference
-            }
-            
-            return result
+            # Parse the XML response
+            try:
+                # Extract the XML content
+                import xml.etree.ElementTree as ET
+                from prompts.prompt_template import xml_to_dict
+                
+                # Clean up the response to ensure it's valid XML
+                xml_content = extract_xml_content(response)
+                
+                # Parse the XML response
+                root = ET.fromstring(xml_content)
+                result_dict = xml_to_dict(root)
+                
+                # Extract the analysis components
+                thinking = result_dict.get("thinking", "")
+                summary = result_dict.get("summary", "")
+                qa_items = result_dict.get("QA", {}).get("QA_item", [])
+                
+                # If QA_item is not a list, make it a list
+                if not isinstance(qa_items, list):
+                    qa_items = [qa_items]
+                
+                # Extract answers to specific questions
+                analysis_text = summary
+                key_points = []
+                sentiment = "neutral"
+                confidence = "medium"
+                
+                for qa_item in qa_items:
+                    question = qa_item.get("question", "").lower()
+                    answer = qa_item.get("answer", "")
+                    
+                    # Extract key points
+                    if "important factors" in question or "key financial" in question:
+                        # Split the answer by sentences or bullet points
+                        points = [p.strip() for p in answer.split('.') if p.strip()]
+                        key_points.extend(points[:5])  # Take up to 5 points
+                    
+                    # Extract sentiment
+                    if "sentiment" in question:
+                        lower_answer = answer.lower()
+                        if "positive" in lower_answer or "bullish" in lower_answer:
+                            sentiment = "positive"
+                        elif "negative" in lower_answer or "bearish" in lower_answer:
+                            sentiment = "negative"
+                    
+                    # Extract confidence
+                    if "confidence" in question:
+                        lower_answer = answer.lower()
+                        if "high" in lower_answer:
+                            confidence = "high"
+                        elif "low" in lower_answer:
+                            confidence = "low"
+                
+                # If no key points were extracted, use the summary
+                if not key_points:
+                    # Split the summary by sentences
+                    points = [p.strip() for p in summary.split('.') if p.strip()]
+                    key_points = points[:5]  # Take up to 5 points
+                
+                # Construct the result
+                result = {
+                    "analysis_type": focus if focus else "general_financial",
+                    "symbol": symbol,
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "insights": analysis_text,
+                    "key_points": key_points,
+                    "sentiment": sentiment,
+                    "confidence": confidence,
+                    "raw_data": data  # Include the original data for reference
+                }
+                
+                return result
+                
+            except Exception as xml_error:
+                print(f"Error parsing XML response: {str(xml_error)}")
+                # Fall back to the original analysis method
+                raise Exception(f"XML parsing failed: {str(xml_error)}")
             
         except Exception as e:
-            print(f"Error during analysis: {str(e)}")
+            print(f"Error during analysis with template: {str(e)}")
             
-            # Fallback to the original OpenAI implementation if Model class fails
+            # Fallback to the original implementation
             try:
+                # Generate a simple prompt
+                fallback_prompt = f"""
+                # Financial Analysis Request for {symbol}
+                
+                Please analyze the following financial data and provide insights:
+                
+                {formatted_data}
+                
+                Focus on: {focus if focus else 'general financial performance'}
+                
+                Please provide:
+                1. A detailed analysis
+                2. Key points (5-7 bullet points)
+                3. Overall sentiment (positive, neutral, negative)
+                4. Confidence level (high, medium, low)
+                """
+                
                 # Call OpenAI API directly
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": "You are a financial analyst providing detailed investment analysis."},
-                        {"role": "user", "content": prompt}
-                    ],
+                response = self.model.generate(
+                    prompt=fallback_prompt,
                     temperature=0.2,
                     max_tokens=4000
                 )
                 
                 # Extract the analysis text
-                analysis_text = response.choices[0].message.content
+                analysis_text = response
                 
                 # Process the analysis to extract key points and sentiment
                 key_points = self._extract_key_points(analysis_text)
@@ -181,45 +290,24 @@ class AnalysisAgent:
         except Exception as e:
             print(f"Error extracting key points: {str(e)}")
             
-            # Fallback to direct OpenAI call if Model class fails
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": "Extract the 5-7 most important key points from this financial analysis. Return ONLY a JSON array of strings with no explanation."},
-                        {"role": "user", "content": analysis_text}
-                    ],
-                    temperature=0.2,
-                    max_tokens=1000,
-                    response_format={"type": "json_object"}
-                )
-                
-                # Parse the response
-                content = response.choices[0].message.content
-                key_points = json.loads(content).get("key_points", [])
-                
-                return key_points
-            except Exception as inner_e:
-                print(f"Fallback key point extraction also failed: {str(inner_e)}")
-                
-                # Simple extraction based on bullet points or numbered lists
-                lines = analysis_text.split('\n')
-                key_points = []
-                
-                for line in lines:
-                    line = line.strip()
-                    if line.startswith('•') or line.startswith('-') or line.startswith('*') or \
-                       (line.startswith(tuple('1234567890')) and '. ' in line[:5]):
-                        point = line.lstrip('•-*1234567890. ')
-                        if point:
-                            key_points.append(point)
-                
-                # If no bullet points found, use the first few sentences
-                if not key_points:
-                    sentences = analysis_text.split('.')[:3]
-                    key_points = [s.strip() + '.' for s in sentences if len(s.strip()) > 20]
-                
-                return key_points
+            # Simple extraction based on bullet points or numbered lists
+            lines = analysis_text.split('\n')
+            key_points = []
+            
+            for line in lines:
+                line = line.strip()
+                if line.startswith('•') or line.startswith('-') or line.startswith('*') or \
+                   (line.startswith(tuple('1234567890')) and '. ' in line[:5]):
+                    point = line.lstrip('•-*1234567890. ')
+                    if point:
+                        key_points.append(point)
+            
+            # If no bullet points found, use the first few sentences
+            if not key_points:
+                sentences = analysis_text.split('.')[:3]
+                key_points = [s.strip() + '.' for s in sentences if len(s.strip()) > 20]
+            
+            return key_points
 
     def _determine_sentiment(self, analysis_text: str) -> Dict[str, str]:
         """Determine the overall sentiment and confidence level from the analysis text.
@@ -256,51 +344,27 @@ class AnalysisAgent:
         except Exception as e:
             print(f"Error determining sentiment: {str(e)}")
             
-            # Fallback to direct OpenAI call if Model class fails
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": "Based on this financial analysis, determine the overall investment sentiment (positive, neutral, negative) and confidence level (high, medium, low). Return ONLY a JSON object with 'sentiment' and 'confidence' keys."},
-                        {"role": "user", "content": analysis_text}
-                    ],
-                    temperature=0.2,
-                    max_tokens=100,
-                    response_format={"type": "json_object"}
-                )
-                
-                # Parse the response
-                content = response.choices[0].message.content
-                result = json.loads(content)
-                
-                return {
-                    "sentiment": result.get("sentiment", "neutral"),
-                    "confidence": result.get("confidence", "medium")
-                }
-            except Exception as inner_e:
-                print(f"Fallback sentiment determination also failed: {str(inner_e)}")
-                
-                # Simple rule-based sentiment analysis
-                lower_text = analysis_text.lower()
-                
-                # Determine sentiment
-                sentiment = "neutral"
-                if any(word in lower_text for word in ["bullish", "positive", "strong buy", "recommend buy"]):
-                    sentiment = "positive"
-                elif any(word in lower_text for word in ["bearish", "negative", "sell", "avoid"]):
-                    sentiment = "negative"
-                
-                # Determine confidence
-                confidence = "medium"
-                if any(word in lower_text for word in ["high confidence", "strongly", "certainly", "definitely"]):
-                    confidence = "high"
-                elif any(word in lower_text for word in ["low confidence", "uncertain", "unclear", "might", "may"]):
-                    confidence = "low"
-                
-                return {
-                    "sentiment": sentiment,
-                    "confidence": confidence
-                }
+            # Simple rule-based sentiment analysis
+            lower_text = analysis_text.lower()
+            
+            # Determine sentiment
+            sentiment = "neutral"
+            if any(word in lower_text for word in ["bullish", "positive", "strong buy", "recommend buy"]):
+                sentiment = "positive"
+            elif any(word in lower_text for word in ["bearish", "negative", "sell", "avoid"]):
+                sentiment = "negative"
+            
+            # Determine confidence
+            confidence = "medium"
+            if any(word in lower_text for word in ["high confidence", "strongly", "certainly", "definitely"]):
+                confidence = "high"
+            elif any(word in lower_text for word in ["low confidence", "uncertain", "unclear", "might", "may"]):
+                confidence = "low"
+            
+            return {
+                "sentiment": sentiment,
+                "confidence": confidence
+            }
     
     def summarize_analyses(self, analyses: List[Dict[str, Any]], symbol: str) -> str:
         """Summarize multiple analyses into a comprehensive investment recommendation.
@@ -312,39 +376,105 @@ class AnalysisAgent:
         Returns:
             str: A comprehensive investment summary in markdown format
         """
-        # Use the summary_prompt function from the template system
-        prompt = summary_prompt(analyses, symbol)
+        # Format the analyses for the prompt
+        formatted_analyses = format_analyses_for_prompt(analyses)
         
         try:
-            # Use the Model class to generate the summary
-            system_prompt = "You are a professional investment analyst creating comprehensive stock analyses. Your summaries are well-structured, data-driven, and balanced, considering both bullish and bearish arguments."
+            # Use the generic_analysis template for summarization
+            template = prompt_manager.get_template("generic_analysis")
+            if not template:
+                raise ValueError("Generic analysis template not found")
             
-            summary = self.model.generate(
+            # Format the template with our values
+            prompt = template.format(
+                overall_goal=f"To provide a comprehensive investment recommendation for {symbol}",
+                context=f"You are summarizing multiple analyses for {symbol} to create a final investment recommendation.",
+                last_step_result=formatted_analyses,
+                questions="1. What is the overall investment recommendation for this stock?\n" +
+                         "2. What are the key strengths of this investment?\n" +
+                         "3. What are the key risks of this investment?\n" +
+                         "4. What is the long-term outlook for this stock?\n" +
+                         "5. What factors should investors monitor going forward?"
+            )
+            
+            # Use the Model class to generate the summary
+            response = self.model.generate(
                 prompt=prompt,
-                system_prompt=system_prompt,
                 temperature=0.3,
                 max_tokens=4000
             )
             
-            return summary
+            # Try to extract the summary from the XML response
+            try:
+                import xml.etree.ElementTree as ET
+                from prompts.prompt_template import xml_to_dict
+                
+                # Clean up the response to ensure it's valid XML
+                xml_content = extract_xml_content(response)
+                
+                # Parse the XML response
+                root = ET.fromstring(xml_content)
+                result_dict = xml_to_dict(root)
+                
+                # Extract the summary and QA components
+                summary = result_dict.get("summary", "")
+                qa_items = result_dict.get("QA", {}).get("QA_item", [])
+                
+                # If QA_item is not a list, make it a list
+                if not isinstance(qa_items, list):
+                    qa_items = [qa_items]
+                
+                # Format the final summary in markdown
+                final_summary = f"# Investment Summary for {symbol}\n\n"
+                final_summary += f"## Executive Summary\n\n{summary}\n\n"
+                
+                # Add Q&A sections
+                for qa_item in qa_items:
+                    question = qa_item.get("question", "")
+                    answer = qa_item.get("answer", "")
+                    
+                    # Format as markdown sections
+                    section_title = question.strip("?").strip()
+                    final_summary += f"## {section_title}\n\n{answer}\n\n"
+                
+                return final_summary
+                
+            except Exception as xml_error:
+                print(f"Error parsing XML summary response: {str(xml_error)}")
+                # Return the raw response if XML parsing fails
+                return response
             
         except Exception as e:
-            print(f"Error generating summary: {str(e)}")
+            print(f"Error generating summary with template: {str(e)}")
             
-            # Fallback to direct OpenAI call if Model class fails
+            # Fallback to a simpler approach
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": "You are a financial advisor providing investment recommendations."},
-                        {"role": "user", "content": prompt}
-                    ],
+                # Generate a simple prompt
+                fallback_prompt = f"""
+                # Investment Summary Request for {symbol}
+                
+                Please summarize the following analyses into a comprehensive investment recommendation:
+                
+                {formatted_analyses}
+                
+                Please provide:
+                1. Executive Summary
+                2. Key Strengths
+                3. Key Risks
+                4. Long-term Outlook
+                5. Factors to Monitor
+                
+                Format your response in markdown with appropriate headings.
+                """
+                
+                # Generate the summary
+                summary = self.model.generate(
+                    prompt=fallback_prompt,
                     temperature=0.3,
                     max_tokens=4000
                 )
                 
-                # Return the summary text
-                return response.choices[0].message.content
+                return summary
                 
             except Exception as inner_e:
                 print(f"Fallback summary generation also failed: {str(inner_e)}")
