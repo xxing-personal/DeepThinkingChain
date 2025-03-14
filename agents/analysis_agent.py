@@ -7,7 +7,6 @@ financial data and extracting investment insights using the OpenAI API.
 
 import json
 import os
-import re
 from typing import Dict, Any, Optional, List, Union
 import time
 from dotenv import load_dotenv
@@ -32,7 +31,7 @@ prompt_manager = PromptManager(TEMPLATES_DIR)
 class AnalysisAgent:
     """Agent performing detailed analysis and extraction of insights from raw financial data."""
     
-    def __init__(self, model_name: str = "gpt-4o"):
+    def __init__(self, model_name: str = "openai/o3-mini"):
         """Initialize the AnalysisAgent with model configuration.
         
         Args:
@@ -41,6 +40,7 @@ class AnalysisAgent:
         # Initialize the Model class
         self.model = Model(model=model_name)
         self.model_name = model_name
+        self.template = prompt_manager.get_template("generic_analysis")
         
     def analyze(self, data: Dict[str, Any], focus: Optional[str] = None, symbol: str = "") -> Dict[str, Any]:
         """Analyzes financial data to identify key insights and investment factors.
