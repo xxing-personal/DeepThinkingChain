@@ -6,12 +6,29 @@ to analyze financial data and extract investment insights using the prompt templ
 """
 
 import os
-from typing import Dict, Any, List
-from .prompt_manager import PromptManager
+import json
+import re
+import sys
+from typing import Dict, Any, List, Optional, Set, Tuple
+
+# Add the parent directory to sys.path if running as a script
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+try:
+    # Try relative import first (when imported as a module)
+    from .prompt_manager import PromptManager
+except ImportError:
+    # Fall back to absolute import (when run as a script)
+    from prompts.prompt_manager import PromptManager
 
 # Initialize the prompt manager with the templates directory
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
+TMP_DIR = os.path.join(os.path.dirname(__file__), "tmp")
 prompt_manager = PromptManager(TEMPLATES_DIR)
+
+# Create tmp directory if it doesn't exist
+os.makedirs(TMP_DIR, exist_ok=True)
 
 def format_data_for_prompt(data: Dict[str, Any]) -> str:
     """
@@ -43,37 +60,118 @@ def format_data_for_prompt(data: Dict[str, Any]) -> str:
     
     return formatted_data
 
-def format_analyses_for_prompt(analyses: List[Dict[str, Any]]) -> str:
+def template_to_markdown(template_path: str) -> str:
     """
-    Format a list of analyses into a string suitable for inclusion in a prompt.
+    Convert a template JSON file to a markdown file and save it to the /tmp folder.
     
     Args:
-        analyses: List of analysis dictionaries to format
+        template_path: Path to the template JSON file
         
     Returns:
-        Formatted string representation of the analyses
+        Path to the created markdown file
     """
-    formatted_analyses = ""
-    for i, analysis in enumerate(analyses):
-        formatted_analyses += f"\n## Analysis {i+1}: {analysis.get('analysis_type', 'General')}\n"
+    try:
+        # Load the template JSON
+        with open(template_path, 'r') as f:
+            template_data = json.load(f)
         
-        # Add key insights
-        if 'insights' in analysis:
-            formatted_analyses += "\nKey Insights:\n"
-            formatted_analyses += analysis['insights']
+        # Extract template components
+        name = template_data.get('name', os.path.basename(template_path).split('.')[0])
+        template_str = template_data.get('template', '')
+        output_format = template_data.get('output_format', '')
+        placeholders = template_data.get('placeholders', [])
         
-        # Add key points if available
-        if 'key_points' in analysis and analysis['key_points']:
-            formatted_analyses += "\n\nKey Points:\n"
-            for point in analysis['key_points']:
-                formatted_analyses += f"- {point}\n"
+        # Create markdown content
+        markdown_content = f"# {name}\n\n"
+
+        # Add template section
+        markdown_content += template_str
         
-        # Add sentiment and confidence
-        if 'sentiment' in analysis:
-            formatted_analyses += f"\nSentiment: {analysis.get('sentiment', 'Neutral')}\n"
-        if 'confidence' in analysis:
-            formatted_analyses += f"Confidence: {analysis.get('confidence', 'Medium')}\n"
+        # Add output format section if available
+        if output_format:
+            markdown_content += "## Output Format\n\n```\n"
+            markdown_content += output_format
+            markdown_content += "\n```\n"
         
-        formatted_analyses += "\n" + "-"*50 + "\n"
+        # Save to markdown file in /tmp folder
+        output_path = os.path.join(TMP_DIR, f"{name}.md")
+        with open(output_path, 'w') as f:
+            f.write(markdown_content)
+        
+        print(f"Template converted to markdown and saved to {output_path}")
+        return output_path
     
-    return formatted_analyses
+    except Exception as e:
+        print(f"Error converting template to markdown: {e}")
+        return ""
+
+def markdown_to_template(markdown_path: str, output_path: Optional[str] = None) -> str:
+    """
+    Convert a markdown file to a template JSON file.
+    
+    Args:
+        markdown_path: Path to the markdown file
+        output_path: Optional path where the JSON file will be saved. If not provided,
+                     it will be saved in the templates directory with the same name.
+        
+    Returns:
+        Path to the created JSON file
+    """
+    try:
+        # Read the markdown file
+        with open(markdown_path, 'r') as f:
+            markdown_content = f.read()
+        
+        # Extract name from the title (first h1)
+        name_match = re.search(r'^# (.+)$', markdown_content, re.MULTILINE)
+        name = name_match.group(1).strip() if name_match else os.path.basename(markdown_path).split('.')[0]
+        
+        # Extract template content
+        template_match = re.search(r'## Template\s*```\s*([\s\S]*?)\s*```', markdown_content)
+        template_str = template_match.group(1).strip() if template_match else ""
+        
+        # Extract output format if available
+        output_format_match = re.search(r'## Output Format\s*```\s*([\s\S]*?)\s*```', markdown_content)
+        output_format = output_format_match.group(1).strip() if output_format_match else ""
+        
+        placeholders = extract_placeholders_from_template(template_str)
+        
+        # Create template data
+        template_data = {
+            "name": name,
+            "template": template_str,
+            "placeholders": placeholders
+        }
+        
+        if output_format:
+            template_data["output_format"] = output_format
+        
+        # Determine output path
+        if not output_path:
+            output_path = os.path.join(TEMPLATES_DIR, f"{name.lower().replace(' ', '_')}_template.json")
+        
+        # Save to JSON file
+        with open(output_path, 'w') as f:
+            json.dump(template_data, f, indent=2)
+        
+        print(f"Markdown converted to template and saved to {output_path}")
+        return output_path
+    
+    except Exception as e:
+        print(f"Error converting markdown to template: {e}")
+        return ""
+
+def extract_placeholders_from_template(template_str: str) -> Set[str]:
+    """
+    Extract all placeholders from a template string.
+    
+    Args:
+        template_str: Template string with placeholders in curly braces
+        
+    Returns:
+        Set of placeholder names
+    """
+    pattern = r'\{([^{}]*)\}'
+    placeholders = set(re.findall(pattern, template_str))
+    return placeholders
+
