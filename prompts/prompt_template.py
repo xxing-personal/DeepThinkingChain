@@ -9,7 +9,6 @@ import re
 import json
 import os
 from typing import List, Optional, Dict, Any, Set
-import xml.etree.ElementTree as ET
 
 
 class PromptTemplate:
@@ -136,44 +135,27 @@ class PromptTemplate:
         # Remove any leading/trailing whitespace
         output = output.strip()
         
-        # Check if the output format is XML-like (with tags)
-        if "<" in self.output_format and ">" in self.output_format:
-            return xml_to_dict(ET.fromstring(output))
-        
-        # Add other format handlers as needed (JSON, key-value, etc.)
-        # For now, we'll focus on the XML-like format
-        
-        raise ValueError(f"Unsupported output format for template {self.name}")
+        # Try to extract JSON from the output
+        try:
+            # Find JSON content between triple backticks if present
+            json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', output)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # If not in code blocks, try to find JSON between curly braces
+                json_match = re.search(r'(\{[\s\S]*\})', output)
+                if json_match:
+                    json_str = json_match.group(1)
+                else:
+                    # Use the entire output as a last resort
+                    json_str = output
+            
+            # Parse the JSON string
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse JSON output: {e}")
     
-def xml_to_dict(element):
-    """Convert an XML element to a dictionary.
     
-    Args:
-        element: XML element to convert
-        
-    Returns:
-        Dictionary representation of the XML element
-    """
-    # If the element has no child elements, return its text directly
-    if len(element) == 0:
-        return element.text.strip() if element.text else ""
-
-    # If the element has children, build a dictionary recursively
-    result = {}
-    for child in element:
-        child_result = xml_to_dict(child)
-
-        if child.tag in result:
-            # If the tag already exists, convert it into a list
-            if not isinstance(result[child.tag], list):
-                result[child.tag] = [result[child.tag]]
-            result[child.tag].append(child_result)
-        else:
-            result[child.tag] = child_result
-
-    return result
-
-
 def load_template_from_json(file_path: str) -> PromptTemplate:
     """Load a template from a JSON file.
     
@@ -212,10 +194,12 @@ def main():
         
         # Example values for the placeholders
         values = {
-            "overall_goal": "To understand the impact of climate change on marine ecosystems",
-            "context": "Previous research has shown that rising ocean temperatures affect coral reefs.",
-            "last_step_result": "A recent study found that 30% of coral species are now endangered due to bleaching events.",
-            "questions": "1. What are the main factors causing coral bleaching?\n2. How quickly are coral populations declining?"
+            "goal": "To understand the impact of climate change on marine ecosystems",
+            "user_intent": "Research how rising ocean temperatures affect coral reefs",
+            "summary": "Previous research has shown that rising ocean temperatures affect coral reefs.",
+            "current_question": "What are the main factors causing coral bleaching?",
+            "last_iteration": "Used web search to find information about coral bleaching",
+            "last_step_result": "A recent study found that 30% of coral species are now endangered due to bleaching events."
         }
         
         # Check if all required placeholders are provided
@@ -230,21 +214,20 @@ def main():
             # Example of how to parse a response
             print("\nExample of parsing a response:")
             example_response = """
-            <r>
-              <thinking>
-                The last_step_result provides information about coral bleaching and endangerment rates.
-                This directly relates to the overall goal of understanding climate change impacts on marine ecosystems.
-              </thinking>
-              <summary>
-                Coral bleaching is accelerating with 30% of species now endangered. [source](https://example.org/coral-study)
-              </summary>
-              <QA>
-                <QA_item>
-                  <question>What are the main factors causing coral bleaching?</question>
-                  <answer>The main factors are rising ocean temperatures and ocean acidification.</answer>
-                </QA_item>
-              </QA>
-            </r>
+            ```json
+            {
+              "result": {
+                "thinking": "The last_step_result provides information about coral bleaching and endangerment rates. This directly relates to the overall goal of understanding climate change impacts on marine ecosystems.",
+                "summary": "Coral bleaching is accelerating with 30% of species now endangered. [source](https://example.org/coral-study)",
+                "QA": [
+                  {
+                    "question": "What are the main factors causing coral bleaching?",
+                    "answer": "The main factors are rising ocean temperatures and ocean acidification."
+                  }
+                ]
+              }
+            }
+            ```
             """
             
             try:

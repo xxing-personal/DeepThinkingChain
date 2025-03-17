@@ -86,6 +86,7 @@ def template_to_markdown(template_path: str) -> str:
 
         # Add template section
         markdown_content += template_str
+        markdown_content += "\n\n"
         
         # Add output format section if available
         if output_format:
@@ -128,7 +129,26 @@ def markdown_to_template(markdown_path: str, output_path: Optional[str] = None) 
         
         # Extract template content
         template_match = re.search(r'## Template\s*```\s*([\s\S]*?)\s*```', markdown_content)
-        template_str = template_match.group(1).strip() if template_match else ""
+        if template_match:
+            template_str = template_match.group(1).strip()
+        else:
+            # If no Template section is found, extract all content between the first section and Output Format
+            first_section_match = re.search(r'^##\s+(.+?)$', markdown_content, re.MULTILINE)
+            if first_section_match:
+                first_section_title = first_section_match.group(0)
+                output_format_section = re.search(r'## Output Format', markdown_content)
+                
+                if output_format_section:
+                    # Extract content from first section to just before Output Format
+                    start_idx = markdown_content.find(first_section_title)
+                    end_idx = output_format_section.start()
+                    template_str = markdown_content[start_idx:end_idx].strip()
+                else:
+                    # If no Output Format section, extract all content after the first section
+                    start_idx = markdown_content.find(first_section_title)
+                    template_str = markdown_content[start_idx:].strip()
+            else:
+                template_str = ""
         
         # Extract output format if available
         output_format_match = re.search(r'## Output Format\s*```\s*([\s\S]*?)\s*```', markdown_content)
@@ -140,7 +160,7 @@ def markdown_to_template(markdown_path: str, output_path: Optional[str] = None) 
         template_data = {
             "name": name,
             "template": template_str,
-            "placeholders": placeholders
+            "placeholders": list(placeholders)  # Convert set to list for JSON serialization
         }
         
         if output_format:
