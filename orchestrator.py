@@ -11,15 +11,8 @@ from agents.planning_agent import PlanningAgent
 from agents.summarization_agent import SummarizationAgent
 
 # Import memory manager
-from memory import MemoryManager
+from memory import MemoryManager, IterationType
 
-# Import prompt functions
-from prompts.analysis_prompts import (
-    initial_analysis_prompt,
-    detailed_analysis_prompt,
-    planning_prompt,
-    summary_prompt
-)
 
 class DeepThinkingChain:
     """Orchestrates multi-agent investment analysis cycles for a given stock symbol."""
@@ -176,11 +169,12 @@ class DeepThinkingChain:
                 "focus": current_focus,
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "data_keys": list(data.keys()),
-                "analysis": analysis_result
+                "analysis": analysis_result,
+                "thinking": f"Analysis of {current_focus} for iteration {self.iteration}"
             }
             
             # Update memory with iteration data
-            self.memory_manager.add_iteration(iteration_memory)
+            self.memory_manager.add_iteration(IterationType.ANALYSIS, iteration_memory)
             
             # Update focus area in memory
             self.memory_manager.update_focus_area(current_focus, completed=True)

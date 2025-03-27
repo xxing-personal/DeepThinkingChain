@@ -7,6 +7,7 @@ collections of prompt templates and providing methods to work with them.
 
 import os
 import json
+import re
 from typing import Dict, List, Optional, Any, Set
 from .prompt_template import PromptTemplate
 
@@ -72,53 +73,97 @@ class PromptManager:
         """
         return list(self.templates.keys())
     
-    def format_template(self, name: str, **kwargs) -> str:
-        """Format a template with provided values.
+    
+    def load_template_from_markdown(self, filepath: str) -> Optional[PromptTemplate]:
+        """Load a template from a markdown file.
         
         Args:
-            name: Name of the template to format
-            **kwargs: Values to use for formatting
+            filepath: Path to the markdown file
             
         Returns:
-            Formatted template string
-            
-        Raises:
-            KeyError: If template not found or missing placeholders
+            PromptTemplate if loaded successfully, None otherwise
         """
-        template = self.get_template(name)
-        if not template:
-            raise KeyError(f"Template '{name}' not found")
-        
-        return template.format(**kwargs)
+        try:
+            # Extract template data from markdown
+            template = PromptTemplate.from_markdown(filepath)
+            self.add_template(template)
+            return template
+        except Exception as e:
+            print(f"Error loading template from {filepath}: {str(e)}")
+            return None
     
-    def load_templates_from_directory(self, directory: str) -> int:
-        """Load templates from JSON files in a directory.
+    def load_template_from_json(self, filepath: str) -> Optional[PromptTemplate]:
+        """Load a template from a JSON file.
         
         Args:
-            directory: Directory path containing template JSON files
+            filepath: Path to the JSON file
+            
+        Returns:
+            PromptTemplate if loaded successfully, None otherwise
+        """
+        try:
+            template = PromptTemplate.from_json(filepath)
+            self.add_template(template)
+            return template
+        except Exception as e:
+            print(f"Error loading template from {filepath}: {str(e)}")
+            return None
+    
+    def load_templates_from_directory(self, directory: str) -> int:
+        """Load templates from JSON and markdown files in a directory.
+        
+        Args:
+            directory: Directory path containing template JSON and markdown files
             
         Returns:
             Number of templates loaded
         """
         count = 0
+        
+        # Make sure directory exists
+        if not os.path.exists(directory):
+            print(f"Warning: Template directory {directory} does not exist")
+            return count
+            
+        # First check for subdirectories
+        for item in os.listdir(directory):
+            item_path = os.path.join(directory, item)
+            
+            # If there's a templates directory, load JSON templates from it
+            if os.path.isdir(item_path) and item == "templates":
+                print(f"Loading templates from {item_path}")
+                for filename in os.listdir(item_path):
+                    if filename.endswith('.json'):
+                        file_path = os.path.join(item_path, filename)
+                        if self.load_template_from_json(file_path):
+                            count += 1
+            
+            # If there's a template directory, load markdown templates from it
+            if os.path.isdir(item_path) and item == "template":
+                print(f"Loading templates from {item_path}")
+                for filename in os.listdir(item_path):
+                    if filename.endswith('.md'):
+                        file_path = os.path.join(item_path, filename)
+                        if self.load_template_from_markdown(file_path):
+                            count += 1
+        
+        # Also load JSON and markdown files from the main directory
         for filename in os.listdir(directory):
+            filepath = os.path.join(directory, filename)
+            
+            # Skip directories
+            if os.path.isdir(filepath):
+                continue
+                
+            # Handle JSON templates
             if filename.endswith('.json'):
-                filepath = os.path.join(directory, filename)
-                try:
-                    with open(filepath, 'r') as f:
-                        template_data = json.load(f)
-                        
-                    # Create template from data
-                    template = PromptTemplate(
-                        name=template_data.get('name', os.path.splitext(filename)[0]),
-                        template_str=template_data.get('template', ''),
-                        description=template_data.get('description', None)
-                    )
-                    
-                    self.add_template(template)
+                if self.load_template_from_json(filepath):
                     count += 1
-                except Exception as e:
-                    print(f"Error loading template from {filepath}: {str(e)}")
+            
+            # Handle markdown templates
+            elif filename.endswith('.md'):
+                if self.load_template_from_markdown(filepath):
+                    count += 1
         
         return count
     
@@ -149,6 +194,7 @@ class PromptManager:
                     'name': template.name,
                     'template': template.template_str,
                     'description': template.description,
+                    'output_format': template.output_format,
                     'placeholders': list(template.get_placeholders())
                 }, f, indent=2)
             return True

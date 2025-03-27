@@ -51,12 +51,12 @@ And you got some last_step_result you can find it at last of this message, and y
 ``` json
 {
   "result": {
-    "thinking": "thinking about last step result",
-    "summary": "summary of the findings",
+    "thinking": "<!-- Insert thinking about last step result here -->",
+    "summary": "<!-- Insert summary of the findings here -->",
     "QA": [
       {
-        "question": "question you can answer",
-        "answer": "answer to the question"
+        "question": "{current_question}",
+        "answer": "<!-- Insert answer here -->"
       }
     ]
   }

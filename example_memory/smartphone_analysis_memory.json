@@ -1,0 +1,29 @@
+{
+  "id": "smartphone_analysis",
+  "name": "Smartphone Market Analysis",
+  "iteration_counter": 0,
+  "max_iterations": 30,
+  "user_intent": "Analyze the current smartphone market trends and identify opportunities/n user_intent_1: \nUnderstand smartphone market trends in 2023",
+  "iterations": [
+    "planning_1: \nPlanning research on smartphone market trends",
+    "analysis_2: \nAnalysis of current smartphone market trends",
+    "summary_3: \nSummary of smartphone market analysis findings"
+  ],
+  "completion_percentage": 0,
+  "questions": [
+    {
+      "id": "ba8da578-5e2e-4a68-88da-72dfc049dee9",
+      "text": "What are the top-selling smartphone brands?",
+      "status": "pending",
+      "answer": ""
+    },
+    {
+      "id": "a48331ae-26ee-4df4-bfe5-517f79320584",
+      "text": "What features are consumers prioritizing?",
+      "status": "pending",
+      "answer": ""
+    }
+  ],
+  "links": [],
+  "summary": "The smartphone market in 2023 shows continued dominance by Apple and Samsung in the premium segment, while Chinese manufacturers are expanding in the mid-range market. Consumers are prioritizing camera quality, battery life, and performance when making purchasing decisions."
+}

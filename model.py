@@ -19,18 +19,12 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Try to import OpenAI
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    logger.warning("OpenAI package not available. Install with 'pip install openai'")
-    OPENAI_AVAILABLE = False
-
 # Try to import LiteLLM for multi-provider support
 try:
     import litellm
     from litellm import ModelResponse, completion
+    # Configure LiteLLM to drop unsupported parameters
+    litellm.drop_params = True
     LITELLM_AVAILABLE = True
 except ImportError:
     logger.warning("LiteLLM package not available. Install with 'pip install litellm'")
@@ -45,39 +39,37 @@ class Model:
     language models, making it easy to switch between providers or models.
     """
     
-    def __init__(self, model: str = "gpt-4o", provider: str = "openai", use_litellm: bool = False):
+    def __init__(self, model: str = "o3-mini"):
         """
         Initialize the model.
         
         Args:
             model: The model identifier to use (e.g., "gpt-4o", "claude-3-opus")
-            provider: The provider to use (e.g., "openai", "anthropic")
-            use_litellm: Whether to use LiteLLM for multi-provider support
         """
         self.model_name = model
-        self.provider = provider
-        self.use_litellm = use_litellm and LITELLM_AVAILABLE
         
-        # Set up the client based on the provider and availability
-        if self.use_litellm:
-            logger.info(f"Using LiteLLM with model: {model}")
-            # LiteLLM will handle the API key
-        elif provider == "openai" and OPENAI_AVAILABLE:
-            api_key = os.environ.get("OPENAI_API_KEY")
-            if not api_key:
-                logger.warning("OPENAI_API_KEY not found in environment variables")
-            self.client = OpenAI(api_key=api_key)
-            logger.info(f"Initialized OpenAI client with model: {model}")
-        else:
-            logger.warning(f"Provider {provider} not supported or required packages not installed")
+        if not LITELLM_AVAILABLE:
+            logger.warning("LiteLLM not available. Some functionality may be limited.")
             
+        # Check for API keys in environment
+        if os.environ.get("OPENAI_API_KEY"):
+            logger.info(f"Found OpenAI API key in environment variables")
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            logger.info(f"Found Anthropic API key in environment variables")
+        
         # Track reasoning capabilities
         self.reasoning_model = model in [
             "gpt-4", "gpt-4-turbo", "gpt-4o", 
             "claude-3-opus", "claude-3-sonnet",
             "gemini-pro", "gemini-1.5-pro"
         ]
+        
+        # Track if this is an O-series model (which only supports temperature=1.0)
+        self.o_series_model = model.startswith("o3-") or model.startswith("o1-")
+        
         self.reasoning_effort = "medium"
+        
+        logger.info(f"Initialized model wrapper with model: {model}")
         
     def set_reasoning_effort(self, reasoning_effort: str = "medium") -> None:
         """
@@ -106,11 +98,15 @@ class Model:
         Returns:
             The response from the language model
         """
+        # Force temperature=1.0 for O-series models and reasoning models
+        if self.o_series_model or self.reasoning_model:
+            temperature = 1.0
+            
         try:
             logger.info(f"Generating chat completion with model: {self.model_name}")
             logger.debug(f"Messages: {messages}")
             
-            if self.use_litellm:
+            if LITELLM_AVAILABLE:
                 response = completion(
                     model=self.model_name,
                     messages=messages,
@@ -118,17 +114,9 @@ class Model:
                     max_tokens=max_tokens
                 )
                 return response
-            elif self.provider == "openai" and OPENAI_AVAILABLE:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-                return response
             else:
-                logger.error("No valid model client available")
-                return {"error": "No valid model client available"}
+                logger.error("LiteLLM not available")
+                return {"error": "LiteLLM not available. Install with 'pip install litellm'"}
         except Exception as e:
             logger.error(f"Error generating chat completion: {str(e)}")
             return {"error": str(e)}
@@ -158,18 +146,16 @@ class Model:
         # Add user prompt
         messages.append({"role": "user", "content": prompt})
         
-        # Get response
+        # Get response - temperature handling is done in _chat_completion
         response = self._chat_completion(
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens
         )
         
-        # Extract content based on provider
+        # Extract content
         try:
-            if self.use_litellm:
-                return response.choices[0].message.content
-            elif self.provider == "openai" and OPENAI_AVAILABLE:
+            if LITELLM_AVAILABLE and isinstance(response, ModelResponse):
                 return response.choices[0].message.content
             elif isinstance(response, dict) and "error" in response:
                 return f"Error: {response['error']}"
@@ -179,293 +165,113 @@ class Model:
             logger.error(f"Error extracting response content: {str(e)}")
             return f"Error extracting response: {str(e)}"
 
-    def analyze_text(self, text: str, focus: str = "general") -> Dict[str, Any]:
+    def generate_json(self, prompt: str,
+                     system_prompt: Optional[str] = None,
+                     temperature: float = 0.2,
+                     max_tokens: Optional[int] = None) -> Dict[str, Any]:
         """
-        Analyze text for different purposes like extracting key points or determining sentiment.
+        Generate a response and parse it as JSON.
         
         Args:
-            text: The text to analyze
-            focus: The focus of the analysis (e.g., "key_points", "sentiment", "planning_summary")
+            prompt: The text prompt
+            system_prompt: Optional system prompt to set context
+            temperature: Controls randomness (0.0 to 1.0), defaults to lower value for more consistent JSON
+            max_tokens: Maximum number of tokens to generate
             
         Returns:
-            Dict containing analysis results
+            Dict or List: The parsed JSON response as a dictionary or list
         """
-        system_prompt = ""
-        prompt = ""
-        temperature = 0.3
-        use_json = False
-        
-        # Configure the analysis based on the focus
-        if focus == "key_points":
-            system_prompt = "Extract the 5-7 most important key points from this financial analysis. Return ONLY a JSON array of strings with no explanation."
-            prompt = f"Extract key points from the following text:\n\n{text}"
-            use_json = True
-        elif focus == "sentiment":
-            system_prompt = "Based on this financial analysis, determine the overall investment sentiment (positive, neutral, negative) and confidence level (high, medium, low). Return ONLY a JSON object with 'sentiment' and 'confidence' keys."
-            prompt = f"Determine the sentiment and confidence from the following text:\n\n{text}"
-            use_json = True
-        elif focus == "planning_summary":
-            system_prompt = "You are a financial advisor providing investment recommendations."
-            prompt = text  # The text is already a prompt in this case
+        # Start with a system prompt that encourages JSON output if none provided
+        if system_prompt:
+            json_system_prompt = f"{system_prompt} Return your response as valid JSON."
         else:
-            system_prompt = "Analyze the following text and provide insights."
-            prompt = f"Analyze the following text:\n\n{text}"
-        
-        # Generate the analysis
-        analysis_text = self.generate(
+            json_system_prompt = "Return your response as valid JSON, with no additional text before or after."
+            
+        # Generate the response - temperature handling is done in _chat_completion and generate
+        response_text = self.generate(
             prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=temperature
+            system_prompt=json_system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens
         )
         
-        # Process the result based on the focus
-        if use_json:
+        # Try to parse the response as JSON
+        try:
+            # First try a direct parse of the full response
             try:
-                # Try to parse as JSON
-                result = json.loads(analysis_text)
-                return {
-                    "analysis": analysis_text,
-                    "parsed_result": result,
-                    "focus": focus,
-                    "timestamp": time.time()
-                }
+                return json.loads(response_text)
             except json.JSONDecodeError:
-                # If JSON parsing fails, return the raw text
-                logger.warning(f"Failed to parse JSON response: {analysis_text}")
-                return {
-                    "analysis": analysis_text,
-                    "error": "Failed to parse JSON response",
-                    "focus": focus,
-                    "timestamp": time.time()
-                }
-        else:
-            # Return the raw text for non-JSON responses
+                # If direct parsing fails, try to extract JSON content
+                pass
+            
+            # Look for brackets in the response
+            array_start = response_text.find('[')
+            array_end = response_text.rfind(']')
+            object_start = response_text.find('{')
+            object_end = response_text.rfind('}')
+            
+            # Determine if we have a valid JSON array or object
+            if array_start != -1 and array_end != -1 and (object_start == -1 or array_start < object_start):
+                # We have an array that starts before any object
+                json_text = response_text[array_start:array_end+1]
+                return json.loads(json_text)
+            elif object_start != -1 and object_end != -1:
+                # We have an object
+                json_text = response_text[object_start:object_end+1]
+                return json.loads(json_text)
+            else:
+                # No valid JSON markers found
+                raise json.JSONDecodeError("No valid JSON found", response_text, 0)
+                
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing JSON response: {str(e)}")
+            logger.debug(f"Failed JSON response: {response_text}")
+            # Return a dictionary with the error and original text
             return {
-                "analysis": analysis_text,
-                "focus": focus,
-                "timestamp": time.time()
+                "error": "Failed to parse JSON response",
+                "original_text": response_text
             }
 
-    def analyze_financial_data(self, data: Dict[str, Any], 
-                              focus: Optional[str] = None,
-                              symbol: str = "") -> Dict[str, Any]:
-        """
-        Analyze financial data for investment insights.
-        
-        Args:
-            data: Financial data to analyze
-            focus: Focus area for analysis (e.g., "financial_performance", "competitive_analysis")
-            symbol: Stock symbol being analyzed
-            
-        Returns:
-            Dict containing analysis results, key points, and sentiment
-        """
-        # Determine the appropriate system prompt based on focus
-        if focus == "financial_performance":
-            system_prompt = "You are a financial analyst specializing in fundamental analysis."
-        elif focus == "competitive_analysis":
-            system_prompt = "You are a market analyst specializing in competitive positioning."
-        elif focus == "growth_prospects":
-            system_prompt = "You are a growth analyst specializing in future projections."
-        elif focus == "risk_assessment":
-            system_prompt = "You are a risk analyst specializing in identifying potential threats."
-        else:
-            system_prompt = "You are an investment analyst providing comprehensive financial analysis."
-        
-        # Format the data for the prompt
-        data_str = json.dumps(data, indent=2)
-        
-        # Create the prompt
-        prompt = f"""
-        Analyze the following financial data for {symbol}:
-        
-        {data_str}
-        
-        Focus on {focus if focus else 'overall financial performance'}.
-        
-        Provide:
-        1. A detailed analysis
-        2. Key points (bullet points)
-        3. Overall sentiment (bullish, neutral, or bearish)
-        4. Confidence level (high, medium, or low)
-        """
-        
-        # Generate the analysis
-        analysis_text = self.generate(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.3  # Lower temperature for more consistent analysis
-        )
-        
-        # Extract key points and sentiment
-        key_points = self._extract_key_points(analysis_text)
-        sentiment = self._determine_sentiment(analysis_text)
-        
-        # Return the results
-        return {
-            "analysis": analysis_text,
-            "key_points": key_points,
-            "sentiment": sentiment["sentiment"],
-            "confidence": sentiment["confidence"],
-            "focus": focus if focus else "general",
-            "symbol": symbol,
-            "timestamp": time.time()
-        }
-    
-    def _extract_key_points(self, analysis_text: str) -> List[str]:
-        """
-        Extract key points from analysis text.
-        
-        Args:
-            analysis_text: The full analysis text
-            
-        Returns:
-            List of key points
-        """
-        # Simple extraction based on bullet points or numbered lists
-        lines = analysis_text.split('\n')
-        key_points = []
-        
-        for line in lines:
-            line = line.strip()
-            # Check for bullet points or numbered lists
-            if line.startswith('•') or line.startswith('-') or line.startswith('*') or \
-               (line.startswith(tuple('1234567890')) and '. ' in line[:5]):
-                # Clean up the point
-                point = line.lstrip('•-*1234567890. ')
-                if point:
-                    key_points.append(point)
-        
-        # If no bullet points found, try to extract using a model
-        if not key_points and len(analysis_text) > 100:
-            try:
-                prompt = f"""
-                Extract the 3-5 most important key points from this financial analysis:
-                
-                {analysis_text}
-                
-                Format each point as a separate line starting with a dash.
-                """
-                
-                key_points_text = self.generate(
-                    prompt=prompt,
-                    system_prompt="You extract key points from financial analyses concisely.",
-                    temperature=0.3
-                )
-                
-                # Process the generated key points
-                for line in key_points_text.split('\n'):
-                    line = line.strip()
-                    if line.startswith('-') or line.startswith('•') or line.startswith('*'):
-                        point = line.lstrip('-•* ')
-                        if point:
-                            key_points.append(point)
-            except Exception as e:
-                logger.error(f"Error extracting key points: {str(e)}")
-                # Fallback: use the first few sentences
-                sentences = analysis_text.split('.')[:3]
-                key_points = [s.strip() + '.' for s in sentences if len(s.strip()) > 20]
-        
-        return key_points
-    
-    def _determine_sentiment(self, analysis_text: str) -> Dict[str, str]:
-        """
-        Determine the sentiment and confidence from analysis text.
-        
-        Args:
-            analysis_text: The full analysis text
-            
-        Returns:
-            Dict with sentiment and confidence
-        """
-        # Look for explicit sentiment statements
-        lower_text = analysis_text.lower()
-        
-        # Check for explicit sentiment indicators
-        sentiment = "neutral"  # Default
-        if "bullish" in lower_text or "positive" in lower_text or "strong buy" in lower_text:
-            sentiment = "bullish"
-        elif "bearish" in lower_text or "negative" in lower_text or "sell" in lower_text:
-            sentiment = "bearish"
-        
-        # Check for explicit confidence indicators
-        confidence = "medium"  # Default
-        if "high confidence" in lower_text or "strongly" in lower_text:
-            confidence = "high"
-        elif "low confidence" in lower_text or "uncertain" in lower_text:
-            confidence = "low"
-        
-        return {
-            "sentiment": sentiment,
-            "confidence": confidence
-        }
-
-
 def main():
-    """Test the Model class with a simple example."""
-    # Create a Model instance
-    model = Model(model="gpt-3.5-turbo")
+    """Test the Model class functionality with the O-series model."""
     
-    # Test basic generation
-    response = model.generate(
-        prompt="What are the key factors to consider when analyzing a technology stock?",
-        system_prompt="You are a financial advisor specializing in technology stocks."
-    )
+    # Create a Model instance with an O-series model
+    model = Model(model="o3-mini")
     
-    print("=== Basic Generation Test ===")
-    print(response)
-    print("\n")
+    print("=== DeepThinkingChain Model Testing ===\n")
     
-    # Test financial data analysis
-    sample_data = {
-        "company_profile": {
-            "name": "Example Tech Inc.",
-            "sector": "Technology",
-            "industry": "Software",
-            "market_cap": 500000000,
-            "price": 45.67
-        },
-        "financial_ratios": {
-            "pe_ratio": 25.4,
-            "price_to_sales": 8.2,
-            "debt_to_equity": 0.5,
-            "current_ratio": 2.1,
-            "profit_margin": 0.15
-        }
-    }
+    # Test basic text generation
+    print("1. Basic Text Generation Test")
+    prompt = "Explain the concept of deep thinking in AI in three sentences."
+    response = model.generate(prompt=prompt)
+    print(f"Prompt: {prompt}")
+    print(f"Response: {response}\n")
     
-    analysis_result = model.analyze_financial_data(
-        data=sample_data,
-        focus="financial_performance",
-        symbol="EXMP"
-    )
+    # Test generation with system prompt
+    print("2. Generation with System Prompt Test")
+    system_prompt = "You are an expert in financial markets speaking to a novice investor."
+    prompt = "What is dollar-cost averaging?"
+    response = model.generate(prompt=prompt, system_prompt=system_prompt)
+    print(f"System: {system_prompt}")
+    print(f"Prompt: {prompt}")
+    print(f"Response: {response}\n")
     
-    print("=== Financial Analysis Test ===")
-    print(f"Analysis for: {analysis_result['symbol']}")
-    print(f"Focus: {analysis_result['focus']}")
-    print(f"Sentiment: {analysis_result['sentiment']} (Confidence: {analysis_result['confidence']})")
-    print("\nKey Points:")
-    for point in analysis_result['key_points']:
-        print(f"- {point}")
-    print("\nFull Analysis:")
-    print(analysis_result['analysis'])
+    # Test JSON generation
+    print("3. JSON Generation Test")
+    prompt = "List three technology stocks and their main products. Include keys for 'symbol', 'company_name', and 'main_products'."
+    json_response = model.generate_json(prompt=prompt)
+    print(f"Prompt: {prompt}")
+    print(f"JSON Response: {json.dumps(json_response, indent=2)}")
     
-    # Test text analysis
-    print("\n=== Text Analysis Test ===")
-    text_to_analyze = """
-    Example Tech Inc. shows strong financial performance with a healthy profit margin of 15% and a current ratio of 2.1, 
-    indicating good liquidity. The PE ratio of 25.4 is reasonable for a technology company, though the price-to-sales 
-    ratio of 8.2 suggests the stock may be somewhat expensive relative to its revenue. The debt-to-equity ratio of 0.5 
-    is manageable and indicates a conservative capital structure. Overall, this appears to be a financially sound company 
-    with good growth potential in the software sector.
-    """
+    # Check if we got a valid JSON response (either dict or list without error)
+    if (isinstance(json_response, dict) and not json_response.get("error")) or isinstance(json_response, list):
+        print("✓ Successfully parsed JSON response")
+    else:
+        print("✗ Failed to parse JSON response")
     
-    sentiment_result = model.analyze_text(text_to_analyze, focus="sentiment")
-    print(f"Sentiment Analysis: {sentiment_result['analysis']}")
-    
-    key_points_result = model.analyze_text(text_to_analyze, focus="key_points")
-    print(f"Key Points Analysis: {key_points_result['analysis']}")
+    print("\n=== Testing Complete ===")
 
 
 if __name__ == "__main__":
-    main() 
+    main()
+    

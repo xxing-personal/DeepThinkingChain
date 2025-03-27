@@ -1,0 +1,36 @@
+{
+  "id": "climate_research",
+  "name": "Climate Change Research",
+  "iteration_counter": 0,
+  "max_iterations": 30,
+  "user_intent": "Research the impacts of climate change on coastal ecosystems/n user_intent_1: \nUnderstand how rising sea levels affect coastal ecosystems",
+  "iterations": [
+    "planning_1: \nuser_intent: Understand how rising sea levels affect coastal ecosystems/n questions: [{'text': 'What are the projected sea level rises for 2050?'}, {'text': 'How do coral reefs respond to temperature changes?'}]/n links: [{'url': 'https://climate.nasa.gov/', 'status': 'pending', 'content': 'NASA climate data'}]",
+    "tool_2: \nSearched for projected sea level rise by 2050",
+    "analysis_3: \nAnalysis of sea level rise data and impacts on coastal ecosystems"
+  ],
+  "completion_percentage": 0,
+  "questions": [
+    {
+      "id": "d1fef2a3-be30-4053-af99-dc62ffafa607",
+      "text": "What are the projected sea level rises for 2050?",
+      "status": "answered",
+      "answer": "NOAA projects global sea level to rise 10-12 inches by 2050, which is as much as the rise measured from 1920 to 2020."
+    },
+    {
+      "id": "fe5af0a1-b846-4ec5-9c77-c9f69c82c07f",
+      "text": "How do coral reefs respond to temperature changes?",
+      "status": "pending",
+      "answer": ""
+    }
+  ],
+  "links": [
+    {
+      "id": "2079ecb1-8079-4b85-bdec-1af660d6a130",
+      "url": "https://climate.nasa.gov/",
+      "status": "pending",
+      "content": "NASA climate data"
+    }
+  ],
+  "summary": ""
+}
