@@ -34,7 +34,7 @@ class PromptTemplate:
         if output_format:
             self.output_format = output_format
         else:
-            self.output_format = self._extract_output_format()
+            self.output_format = self._extract_output_format(template_str)
         self.name = name or "template_" + str(uuid.uuid4())
         self.description = description or f"Template for {name}"
         self._placeholders = self._extract_placeholders()
@@ -101,13 +101,13 @@ class PromptTemplate:
         placeholders = set(re.findall(pattern, self.template_str))
         return placeholders
 
-    def _extract_output_format(self) -> str:
+    def _extract_output_format(self, template_str: str) -> str:
         """Extract the output format from the string. assuming string is in markdown format
 
         Returns:
             The output format string
         """
-        output_format_match = re.search(r'## Output:\s*\n(.*?)(?:\n\n|$)', self.template_str, re.DOTALL)
+        output_format_match = re.search(r'## Output:\s*\n(.*?)(?:\n\n|$)', template_str, re.DOTALL)
         if output_format_match:
             output_format = output_format_match.group(1).strip()
             # If the output format starts with a format specifier (like "json"), remove it
@@ -115,7 +115,7 @@ class PromptTemplate:
             if len(format_lines) > 1:
                 return format_lines[1].strip()
             return output_format
-        logger.warning(f"No output format found in the template: {self.template_str}")
+        logger.warning(f"No output format found in the template")
         return ""
 
     def get_placeholders(self) -> Set[str]:
@@ -190,5 +190,4 @@ def format_data_for_prompt(data: Dict[str, Any]) -> str:
         else:
             formatted_data += f"{key}: {value}\n"
     
-    return formatted_data
-
+    return formatted_data 

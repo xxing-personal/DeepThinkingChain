@@ -5,100 +5,113 @@ This module contains the IntentAnalysisAgent class which is responsible for anal
 and classifying user intents to guide the financial analysis process.
 """
 
-import json
-import os
 import time
-import re
-from typing import Dict, Any, Optional, List, Union, Tuple
-from dotenv import load_dotenv
+import logging
+import os
+import sys
+from typing import Dict, Any, Optional, List, Union
 
-# Import the prompt manager and helper functions
-from prompts.prompt_manager import PromptManager
-from prompts.prompt_template import PromptTemplate
 
-# Import the Model class
+from agents.agent_base import Agent
+
+# Import helper functions and required components
 from model import Model
-
-# Import the MemoryManager class
-from memory import MemoryManager, Question
+from memory import MemoryManager
 from constants import AgentType
 
-# Load environment variables
-load_dotenv()
+# Set up logging
+logger = logging.getLogger(__name__)
 
-# Initialize the prompt manager with both templates and template directories
-PROMPTS_DIR = os.path.dirname(os.path.dirname(__file__))
-prompt_manager = PromptManager(PROMPTS_DIR)
-
-class IntentAnalysisAgent:
+class IntentAnalysisAgent(Agent):
     """Agent performing analysis of user intents to guide financial analysis."""
     
-    
-    def __init__(self, model_name: str = "gpt-3.5-turbo", template_name: str = "intent_analysis"):
+    def __init__(self, prompt_template_name: str = "intent_analysis", 
+                 memory_manager: Optional[Union[str, MemoryManager]] = None, 
+                 model_name: str = None):
         """Initialize the IntentAnalysisAgent with model configuration.
         
         Args:
-            model_name: The model to use for analysis. Defaults to "gpt-3.5-turbo".
-            template_name: The template to use for analysis. Defaults to "intent_analysis".
+            prompt_template_name: The template to use for analysis. Defaults to "intent_analysis".
+            memory_manager: Optional memory manager for saving agent results
+            model_name: The model to use for analysis.
         """
-        # Initialize the Model class
+        # Initialize the base Agent class
+        super().__init__(prompt_template_name=prompt_template_name, 
+                         memory_manager=memory_manager, 
+                         model_name=model_name)
+        
+        # Set the agent type
+        self.agent_type = AgentType.PLANNING
+        
+        # Update metadata
+        self.metadata.update({
+            "agent_type": self.agent_type
+        })
+        
+        # Initialize model for generating text
         self.model = Model(model=model_name)
-        self.model_name = model_name
-        
-        # Use a default template if the specified one doesn't exist
-        self.template_name = template_name
-        self.template = prompt_manager.get_template(template_name)
-        
-        # Create a simple default template if none exists
-        if not self.template:
-            self._create_default_template()
     
-    def analyze_intent(self, user_query: str, memory: Optional[MemoryManager] = None) -> Dict[str, Any]:
-        """Analyze a user query to determine their financial analysis intent.
+    def _run(self, user_query: str) -> Dict[str, Any]:
+        """Run the intent analysis agent to determine the user's financial analysis intent.
         
         Args:
             user_query: The user's query or request
-            memory: Optional MemoryManager instance to store results
             
         Returns:
             A dictionary containing the analysis results
         """
-            # Instead of using the template's format method, construct the prompt directly
-        prompt = self.template.format(user_query=user_query)
-            
+        try:
+            # Process the template with the user query
+            prompt = self.process_template(user_query=user_query)
             
             # Use the Model class to analyze the intent
-        response = self.model.generate_json(
-                prompt=prompt
-        )
-        response['user_query'] = user_query
-        if 'follow_up_questions' in response:
-            pass
+            response = self.model.generate_json(prompt=prompt)
             
+            # Add user query to the response
+            result = response
+            result['user_query'] = user_query
+            result['timestamp'] = time.strftime("%Y-%m-%d %H:%M:%S")
+            result['status'] = 'success'
+            
+            # Add a summary for the result
+            if 'primary_intent' in result:
+                result['summary'] = f"Analyzed user intent: {result.get('primary_intent', 'financial_analysis')}"
+            else:
+                result['summary'] = f"Analyzed query: {user_query[:50]}..."
+                
+            return result
+                
+        except Exception as e:
+            logger.error(f"Error during intent analysis: {str(e)}")
+            
+            # Return an error result
+            return {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "error": str(e),
+                "status": "failed",
+                "user_query": user_query
+            }
+    
+    def analyze_intent(self, user_query: str) -> Dict[str, Any]:
+        """Public method to analyze a user query (wrapper around run).
         
-    def _format_response_to_str(self, response: Dict[str, Any]) -> Dict[str, Any]:
-        """Format the response to a string.
+        Args:
+            user_query: The user's query or request
+            
+        Returns:
+            A dictionary containing the analysis results
+        """
+        return self.run(user_query)
+    
+    def _format_response_to_str(self, response: Dict[str, Any]) -> str:
+        """Format the response to a human-readable string.
         
         Args:
             response: The response from the model
+            
+        Returns:
+            A formatted string representation of the response
         """
-        return f"The goal for the deep research is {response['user_query']}\n" + response['intent_analysis']
+        return f"The goal for the deep research is {response['user_query']}\n" + response.get('intent_analysis', '')
 
-    def _save_to_memory(self, memory: MemoryManager, intent_data: Dict[str, Any]) -> None:
-        """Save intent analysis results to memory.
-        
-        Args:
-            memory: MemoryManager instance
-            intent_data: Intent analysis results
-        """
-        # Add the intent analysis as a new iteration in memory
-        iteration_data = {
-            "type": IterationType.PLANNING.value,
-            "timestamp": intent_data["timestamp"],
-            "intent_analysis": intent_data,
-            "summary": f"Analyzed user intent: {intent_data.get('primary_intent', 'financial_analysis')}"
-        }
-        
-        memory.add_iteration(AgentType.PLANNING, iteration_data)
-    
  

@@ -13,7 +13,8 @@ import time
 from dataclasses import dataclass, field
 from uuid import uuid4
 from enum import Enum
-from constants import AgentType
+
+from deepthinkingchain.constants import AgentType
 
 @dataclass
 class Question:
@@ -198,10 +199,10 @@ class MemoryManager:
         """Save the current memory state to disk.
         
         Returns:
-            Boolean indicating success or failure
+            bool: True if successful, False otherwise
         """
-        try:            
-            # Update sub-managers data
+        try:
+            # Update any sub-manager data in memory
             self.memory["questions"] = [q.to_dict() for q in self.questions]
             self.memory["links"] = [l.to_dict() for l in self.links]
             
@@ -216,24 +217,24 @@ class MemoryManager:
         """Get the current memory state.
         
         Returns:
-            Dict containing the current memory data
+            Dict containing the current memory
         """
         return self.memory
     
     def update_memory(self, updates: Dict[str, Any]) -> Dict[str, Any]:
-        """Update the memory with new data.
+        """Update the memory with new key-value pairs.
         
         Args:
-            updates: Dict containing the updates to apply to the memory
+            updates: Dictionary of updates to apply to memory
             
         Returns:
-            Dict containing the updated memory data
+            Dict containing the updated memory
         """
-        # Update the memory with the new data
+        # Update memory with new data
         for key, value in updates.items():
             self.memory[key] = value
         
-        # Save the updated memory
+        # Save changes to disk
         self.save_memory()
         
         return self.memory
@@ -242,276 +243,310 @@ class MemoryManager:
         """Add a new iteration to the memory.
         
         Args:
-            iteration_type: Type of agent that generated this iteration
-            iteration_data: Dict containing the iteration data
+            iteration_type: The type of iteration (analysis, planning, etc.)
+            iteration_data: Data from this iteration
+            
         Returns:
-            Dict containing the updated memory data
+            Dict containing the updated memory
         """
-        # Add the iteration and update completion percentage
-        self.iteration_counter += 1
-        self._update_completion_percentage()
+        # Get current iterations or initialize empty list
+        iterations = self.memory.get("iterations", [])
         
-        # add iteration summary
-        full_result = "/n ".join(": ".join((str(k),str(v))) for k,v in iteration_data.items())
+        # Add timestamp if not provided
+        if "timestamp" not in iteration_data:
+            iteration_data["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
         
-        # check if there is summary in iteration_Data
-        if 'thinking' in iteration_data:
-            thinking_str = iteration_data['thinking']
-        else:
-            if iteration_type == AgentType.TOOL:
-                # cutoff tool result because it is too long
-                thinking_str = full_result[:100]
-            else:
-                thinking_str = full_result
-
-        self.memory["iterations"].append(iteration_type.value + "_" + str(self.iteration_counter) + ": \n" + thinking_str)
-
-        # update user intent
-        if 'user_intent' in iteration_data:
-            self.memory["user_intent"] += "/n user_intent_" + str(self.iteration_counter) + ": \n" + iteration_data['user_intent']
-
-        # deal with questions:
-        if 'questions' in iteration_data:
-            for question in iteration_data['questions']:
-                # if answer exists, add it to the question
-                if 'answer' in question:
-                    self.add_answer(question['text'], question['answer'])
-                else:
-                    self.add_question(question['text'])
+        # Add type if not provided
+        if "type" not in iteration_data:
+            iteration_data["type"] = iteration_type
         
-        # deal with links:
-        if 'links' in iteration_data:
-            for link in iteration_data['links']:
-                # if visited, update the status
-                if link['status'] == 'visited':
-                    self.update_link_status(link['url'], link['status'], link['content'])
-                else:
-                    self.add_link(link['url'], link['status'], link['content'])
-        # update summary:
-        if 'summary' in iteration_data:
-            self.memory["summary"] += iteration_data['summary']
-
+        # Add to iterations list
+        iterations.append(iteration_data)
+        
+        # Update memory
+        self.memory["iterations"] = iterations
+        
+        # Increment iteration counter
+        self.memory["iteration_counter"] = len(iterations)
+        
+        # Update completion percentage if not provided
+        if "completion_percentage" not in iteration_data:
+            total_iterations = self.memory.get("max_iterations", 10)
+            current_iteration = len(iterations)
+            completion = min(100, int((current_iteration / total_iterations) * 100))
+            self._update_completion_percentage(completion)
+        
+        # Save changes
         self.save_memory()
+        
         return self.memory
-
     
-    def _update_completion_percentage(self, new_completion_percentage: float = None) -> float:
-        """Update the analysis completion percentage based on iterations and focus areas.
+    def update_focus_area(self, focus_area: str, completed: bool = False) -> Dict[str, Any]:
+        """Update a focus area's completion status.
         
         Args:
-            new_completion_percentage: Optional new completion percentage to set
+            focus_area: The name of the focus area
+            completed: Whether this focus area is completed
             
         Returns:
-            Float representing the completion percentage
+            Dict containing the updated memory
         """
+        # Get completed focus areas or initialize empty list
+        completed_focus_areas = self.memory.get("completed_focus_areas", [])
         
-        current_percentage = self.memory.get("completion_percentage", 0)
+        # Get required focus areas or initialize with defaults
+        required_focus_areas = self.memory.get("required_focus_areas", [
+            "financial_performance", "competitive_analysis", 
+            "growth_prospects", "risk_assessment"
+        ])
         
-        # Use the new percentage if provided, otherwise keep the current one
-        if new_completion_percentage is not None:
-            completion_percentage = max(new_completion_percentage, current_percentage)
-        else:
-            completion_percentage = current_percentage
+        # Add to completed list if marked as completed
+        if completed and focus_area not in completed_focus_areas:
+            completed_focus_areas.append(focus_area)
             
-        max_iterations = self.memory.get("max_iterations", 5)
-        iterations = self.memory.get("iterations", [])
-        
-        if len(iterations) > max_iterations:
-            completion_percentage = 1            
         # Update memory
-        self.memory["completion_percentage"] = round(completion_percentage, 2)
+        self.memory["completed_focus_areas"] = completed_focus_areas
+        self.memory["required_focus_areas"] = required_focus_areas
+        self.memory["current_focus"] = focus_area
         
-        return self.memory["completion_percentage"]
+        # Update completion percentage based on focus areas
+        if len(required_focus_areas) > 0:
+            completion = int((len(completed_focus_areas) / len(required_focus_areas)) * 100)
+            self._update_completion_percentage(completion)
+        
+        # Save changes
+        self.save_memory()
+        
+        return self.memory
+    
+    def _update_completion_percentage(self, new_completion_percentage: float = None) -> float:
+        """Update the completion percentage for this analysis.
+        
+        Args:
+            new_completion_percentage: New completion percentage (0-100)
+            
+        Returns:
+            float: The updated completion percentage
+        """
+        # If no percentage provided, calculate based on iterations
+        if new_completion_percentage is None:
+            total_iterations = self.memory.get("max_iterations", 10)
+            current_iteration = len(self.memory.get("iterations", []))
+            new_completion_percentage = min(100, int((current_iteration / total_iterations) * 100))
+        
+        # Ensure percentage is within valid range
+        new_completion_percentage = max(0, min(100, new_completion_percentage))
+        
+        # Update memory
+        self.memory["completion_percentage"] = new_completion_percentage
+        
+        return new_completion_percentage
     
     def get_latest_iteration(self) -> Optional[Dict[str, Any]]:
-        """Get the most recent iteration data.
+        """Get the most recent iteration from memory.
         
         Returns:
-            Dict containing the latest iteration data, or None if no iterations exist
+            Dict containing the latest iteration, or None if no iterations
         """
         iterations = self.memory.get("iterations", [])
-        if iterations:
-            return iterations[-1]
-        return None
+        if not iterations:
+            return None
+        return iterations[-1]
     
     def clear_memory(self) -> bool:
-        """Clear the memory and start fresh.
+        """Clear all memory data and reset to initial state.
         
         Returns:
-            Boolean indicating success or failure
+            bool: True if successful, False otherwise
         """
         try:
+            # Preserve ID and name
+            memory_id = self.memory_id
+            name = self.name
+            
+            # Re-initialize memory
             self._initialize_memory()
-            self.questions = []
-            self.links = []
-            self.categories = {}
+            
             return True
         except Exception as e:
             print(f"⚠️ Error clearing memory: {str(e)}")
             return False
     
     def export_memory(self, export_file: Optional[str] = None) -> str:
-        """Export the memory to a JSON file.
+        """Export memory to a JSON file.
         
         Args:
-            export_file: Path to the export file (default: None, uses timestamp)
+            export_file: File path for export, defaults to timestamped file
             
         Returns:
-            Path to the exported file
+            str: Path to the export file
         """
-        if export_file is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            export_file = f"exports/{self.memory_id}_memory_{timestamp}.json"
-        
-        # Create exports directory if it doesn't exist and the path has a directory
-        directory = os.path.dirname(export_file)
-        if directory:  # Only create directory if there is one in the path
-            os.makedirs(directory, exist_ok=True)
+        if not export_file:
+            # Create timestamped export filename
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            export_file = f"{self.memory_dir}/export_{self.memory_id}_{timestamp}.json"
         
         try:
+            # Export memory
             with open(export_file, 'w') as f:
                 json.dump(self.memory, f, indent=2)
+            
             print(f"📤 Exported memory to {export_file}")
             return export_file
         except Exception as e:
             print(f"⚠️ Error exporting memory: {str(e)}")
             return ""
     
-    # QA Manager methods
+    # Question management methods
+    
     def add_question(self, text: str) -> Question:
-        """
-        Add a new question to track
+        """Add a new question to the system.
         
         Args:
             text: The question text
             
         Returns:
-            Question: The created question object
+            Question: The created Question object
         """
-        question = Question(
-            id=str(uuid4()),
-            text=text
-        )
+        # Create new question
+        question = Question(id=str(uuid4()), text=text)
+        
+        # Add to questions list
         self.questions.append(question)
+        
+        # Update memory and save
+        self.memory["questions"] = [q.to_dict() for q in self.questions]
         self.save_memory()
+        
         return question
     
-    def get_questions_by_status(self, status: Optional[bool] = None) -> List[Question]:
-        """
-        Get questions filtered by their type
+    def get_questions_by_status(self, status: Optional[str] = None) -> List[Question]:
+        """Get questions filtered by status.
         
         Args:
-            is_original: If True, returns original questions. If False, returns follow-up questions.
-                         If None, returns all questions.
+            status: Status to filter by (or None for all questions)
             
         Returns:
-            List[Question]: List of questions matching the specified type
+            List of Question objects
         """
-        if status is None:
-            return self.questions
-        return [q for q in self.questions if q.status == status]
+        if status:
+            return [q for q in self.questions if q.status == status]
+        return self.questions
     
     def add_answer(self, question_identifier: str, text: str) -> str:
-        """
-        Add an answer to a question
+        """Add an answer to a question.
         
         Args:
-            question_identifier: Either the ID or the text of the question to answer
+            question_identifier: ID or text of the question
             text: The answer text
             
         Returns:
-            The answer text
+            str: The answer text, or empty string if question not found
         """
-        # Try to find the question by ID first
-        for question in self.questions:
-            if question.id == question_identifier:
-                answer = question.add_answer(text)
-                self.save_memory()
-                return answer
+        # Find question by ID or text
+        question = None
+        for q in self.questions:
+            if q.id == question_identifier or q.text == question_identifier:
+                question = q
+                break
         
-        # If not found by ID, try to find by text
-        for question in self.questions:
-            if question.text == question_identifier:
-                answer = question.add_answer(text)
-                self.save_memory()
-                return answer
+        if not question:
+            print(f"⚠️ Question not found: {question_identifier}")
+            return ""
         
-        raise ValueError(f"Question with ID or text '{question_identifier}' not found")
+        # Add answer
+        answer = question.add_answer(text)
+        
+        # Update memory and save
+        self.memory["questions"] = [q.to_dict() for q in self.questions]
+        self.save_memory()
+        
+        return answer
     
     def get_question_answers(self, question_id: str) -> List[str]:
-        """
-        Get all answers for a specific question
+        """Get all answers for a specific question.
         
         Args:
-            question_id: The ID of the question
+            question_id: ID of the question
             
         Returns:
-            List[str]: List containing the answer string for backward compatibility
+            List of answer texts
         """
-        for question in self.questions:
-            if question.id == question_id:
-                # Return as a list with a single item for backward compatibility
-                return [question.answer] if question.answer else []
+        # Find question by ID
+        for q in self.questions:
+            if q.id == question_id:
+                if not q.answer:
+                    return []
+                # Split by the newline separator
+                return q.answer.split("/n ")
+        
         return []
     
     def get_qa_summary(self, show_unsolved: bool = False) -> str:
-        """
-        Get a human-readable summary of the QA manager's state
+        """Get a summary of questions and answers.
         
         Args:
-            show_unsolved: Whether to include unsolved questions in the summary
+            show_unsolved: Whether to include unanswered questions
             
         Returns:
-            A string summary of the QA manager's state
+            str: Formatted summary text
         """
         if not self.questions:
-            return "No questions have been asked."
-            
-        summary = [f"# Questions and Answers ({len(self.questions)} questions)"]
-
-        for question in self.questions:
-            if show_unsolved or question.status == "answered":
-                status_marker = "✓" if question.status == "answered" else "❓"
-                summary.append(f"\n### {status_marker} {question.text}")
-
-                if question.answer:
-                    summary.append(f"**Answer**: {question.answer}")
-                else:
-                    summary.append("*No answer yet*")
+            return "No questions found."
+        
+        # Filter questions
+        if not show_unsolved:
+            questions = [q for q in self.questions if q.status == "answered"]
+        else:
+            questions = self.questions
+        
+        # Generate summary
+        summary = []
+        for i, q in enumerate(questions):
+            if q.status == "answered":
+                summary.append(f"Q{i+1}: {q.text}")
+                summary.append(f"A: {q.answer}")
+                summary.append("")
+            elif show_unsolved:
+                summary.append(f"Q{i+1}: {q.text}")
+                summary.append("A: [Not yet answered]")
+                summary.append("")
+        
         return "\n".join(summary)
-
-    # Link Manager methods
-    def add_link(self, url: str, status: str, content: str) -> Link:
-        """
-        Add a link to track
+    
+    # Link tracking methods
+    
+    def add_link(self, url: str, status: str = "pending", content: str = "") -> Link:
+        """Add a new link to the tracking system.
         
         Args:
-            url: The URL of the link
-            status: The status of the link (pending, visited, failed, etc.)
-            content: A one sentence summary of the content
+            url: The URL to track
+            status: Initial status (default: pending)
+            content: Optional content summary
             
         Returns:
-            Link: The created link object
+            Link: The created Link object
         """
-        link = Link(
-            id=str(uuid4()),
-            url=url,
-            status=status,
-            content=content
-        )
+        # Create new link
+        link = Link(id=str(uuid4()), url=url, status=status, content=content)
+        
+        # Add to links list
         self.links.append(link)
+        
+        # Update memory and save
+        self.memory["links"] = [l.to_dict() for l in self.links]
         self.save_memory()
+        
         return link
     
     def get_link_by_url(self, url: str) -> Optional[Link]:
-        """
-        Get a link by its URL
+        """Get a link by its URL.
         
         Args:
-            url: The URL to search for
+            url: The URL to find
             
         Returns:
-            Optional[Link]: The link if found, None otherwise
+            Link object or None if not found
         """
         for link in self.links:
             if link.url == url:
@@ -519,91 +554,86 @@ class MemoryManager:
         return None
     
     def update_link_status(self, url: str, status: str, content: str = None) -> Optional[Link]:
-        """
-        Update the status and content of a link
+        """Update a link's status and optionally its content.
         
         Args:
-            url: The URL of the link to update
-            status: The new status
+            url: The URL to update
+            status: New status
             content: Optional new content summary
             
         Returns:
-            Optional[Link]: The updated link if found, None otherwise
+            Updated Link object or None if not found
         """
-        for link in self.links:
-            if link.url == url:
-                link.status = status
-                if content:
-                    link.content = content
-                self.save_memory()
-                return link
-        return None
+        link = self.get_link_by_url(url)
+        if not link:
+            return None
+        
+        # Update link
+        link.status = status
+        if content is not None:
+            link.content = content
+        
+        # Update memory and save
+        self.memory["links"] = [l.to_dict() for l in self.links]
+        self.save_memory()
+        
+        return link
     
     def get_links_by_status(self, status: str) -> List[Link]:
-        """
-        Get all links with a specific status
+        """Get links filtered by status.
         
         Args:
-            status: The status to filter by
+            status: Status to filter by
             
         Returns:
-            List[Link]: List of links with the specified status
+            List of Link objects
         """
-        return [link for link in self.links if link.status == status]
+        return [l for l in self.links if l.status == status]
     
     def get_links_summary(self) -> str:
-        """
-        Get a human-readable summary of the links
+        """Get a summary of tracked links.
         
         Returns:
-            A string summary of the links
+            str: Formatted summary text
         """
         if not self.links:
-            return "No links have been tracked."
+            return "No links tracked."
         
-        summary = [f"# Links ({len(self.links)} total)"]
+        # Generate summary
+        summary = []
         
-        # Group links by status
+        # Group by status
         status_groups = {}
         for link in self.links:
             if link.status not in status_groups:
                 status_groups[link.status] = []
             status_groups[link.status].append(link)
         
-        # Add links by status
+        # Format summary
         for status, links in status_groups.items():
-            summary.append(f"\n## {status.capitalize()} ({len(links)})")
-            for link in links:
-                summary.append(f"- [{link.url}] - {link.content}")
+            summary.append(f"{status.capitalize()} Links:")
+            for i, link in enumerate(links):
+                summary.append(f"{i+1}. {link.url}")
+                if link.content:
+                    summary.append(f"   Summary: {link.content}")
+            summary.append("")
         
         return "\n".join(summary)
-
     
     def _construct_parameters(self) -> Dict[str, Any]:
-        """Output all parameters of the memory manager.
+        """
+        Get parameters dictionary for system communication
         
         Returns:
-            Dictionary containing all parameters of the memory manager
+            Dict of system parameters
         """
-        output_dict = {}
-        if self.memory:
-            output_dict["user_intent"] = self.memory["user_intent"]
-            output_dict["completion_percentage"] = self.memory["completion_percentage"]
-            output_dict["summary"] = self.memory["summary"]
-            output_dict["remaining_iterations"] = self.memory["max_iterations"] - self.memory["iteration_counter"]
-            output_dict["iterations"] = "/n ".join(self.memory["iterations"])
-            output_dict["summary"] = self.memory["summary"]
-        if self.questions:
-            output_dict["unsolved_questions"] = [q.text for q in self.get_questions_by_status(status="pending")]
-            output_dict["solved_questions"] = self.get_qa_summary(show_unsolved=False)
-            output_dict["all_questions_status"] = [q.text + " (" + q.status + ")" for q in self.questions]
-        if self.links:
-            output_dict["unvisted_link"] = [l.url for l in self.links if l.status == "pending"]
-            output_dict["visited_link"] = [l.url for l in self.links if l.status == "visited"]
-            output_dict["failed_link"] = [l.url for l in self.links if l.status == "failed"]
-        return output_dict
-    
- 
-
-
-
+        return {
+            "memory_id": self.memory_id,
+            "iterations": len(self.memory.get("iterations", [])),
+            "max_iterations": self.memory.get("max_iterations", 10),
+            "completion_percentage": self.memory.get("completion_percentage", 0),
+            "pending_questions": len(self.get_questions_by_status("pending")),
+            "answered_questions": len(self.get_questions_by_status("answered")),
+            "pending_links": len(self.get_links_by_status("pending")),
+            "visited_links": len(self.get_links_by_status("visited")),
+        } 

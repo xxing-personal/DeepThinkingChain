@@ -10,22 +10,16 @@ import os
 import time
 import logging
 import re
-import sys
 from typing import Dict, Any, Optional, List, Union
 
-# Add parent directory to sys.path
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
 # Import the base Agent class
-from .agent_base import Agent
+from deepthinkingchain.agents.agent_base import Agent
 
 # Import helper functions
-from prompts.prompt_template import format_data_for_prompt
-from memory import MemoryManager
-from model import Model
-from constants import AgentType
+from deepthinkingchain.prompts.prompt_template import format_data_for_prompt
+from deepthinkingchain.memory import MemoryManager
+from deepthinkingchain.model import Model
+from deepthinkingchain.constants import AgentType
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -197,5 +191,50 @@ class AnalysisAgent(Agent):
                     logger.error(f"Failed to update memory with error: {str(mem_err)}")
             
             return error_result
-    
-    
+                
+    def analyze(self, data: Dict[str, Any], focus: str = "general", symbol: str = None) -> Dict[str, Any]:
+        """Public method to analyze financial data with a specific focus.
+        
+        Args:
+            data: Dictionary containing the financial data to analyze
+            focus: The focus area of the analysis (e.g., "financial_performance", "competitive_analysis")
+            symbol: Optional stock symbol being analyzed
+            
+        Returns:
+            A dictionary containing the analysis results
+        """
+        try:
+            # Add focus and symbol to the data if provided
+            if focus:
+                data["focus"] = focus
+            if symbol:
+                data["symbol"] = symbol
+                
+            # Run the analysis
+            results = self.run(data)
+            
+            # Make sure timestamp is in the results
+            if "timestamp" not in results:
+                results["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                
+            # Make sure analysis_type is set based on focus
+            if "analysis_type" not in results:
+                results["analysis_type"] = focus
+                
+            # Make sure symbol is included 
+            if symbol and "symbol" not in results:
+                results["symbol"] = symbol
+                
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error during analyze call: {str(e)}")
+            
+            # Return basic error structure
+            return {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "analysis_type": focus,
+                "symbol": symbol,
+                "error": str(e),
+                "status": "failed"
+            } 

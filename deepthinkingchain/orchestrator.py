@@ -1,3 +1,10 @@
+"""
+Orchestrator for the Deep Thinking Chain.
+
+This module contains the DeepThinkingChain class which coordinates the agents
+and workflow for multi-agent investment analysis.
+"""
+
 import json
 import os
 import time
@@ -175,7 +182,7 @@ class DeepThinkingChain:
             }
             
             # Update memory with iteration data
-            self.memory_manager.add_iteration(IterationType.ANALYSIS, iteration_memory)
+            self.memory_manager.add_iteration(AgentType.ANALYSIS, iteration_memory)
             
             # Update focus area in memory
             self.memory_manager.update_focus_area(current_focus, completed=True)
@@ -245,7 +252,7 @@ class DeepThinkingChain:
         print("📋 Summarization Agent: Generating investment summary...")
         try:
             # Generate the summary
-            summary = self.summarization_agent.summarize(self.analyses, symbol=self.symbol)
+            summary = self.summarization_agent.generate_summary(symbol=self.symbol, analyses=self.analyses, iterations=self.iteration)
             
             # Save summary to results directory
             summary_file = f"results/{self.symbol}_summary.md"
@@ -324,4 +331,4 @@ if __name__ == "__main__":
     chain = DeepThinkingChain(symbol, max_iterations=max_iterations)
     summary_file = chain.run()
     
-    print(f"\nTo view results: cat {summary_file}")
+    print(f"\nTo view results: cat {summary_file}") 

@@ -8,24 +8,18 @@ specialized agents for different tasks in the DeepThinkingChain system.
 import logging
 import time
 import os
-import sys
 from typing import Dict, Any, Union, List, Callable
 
-# Add the parent directory to sys.path to be able to import from parent modules
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
 # Import the existing PromptManager and PromptTemplate
-from prompts import PromptManager, PromptTemplate
-from memory import MemoryManager
-from constants import AgentType
+from deepthinkingchain.prompts import PromptManager, PromptTemplate
+from deepthinkingchain.memory import MemoryManager
+from deepthinkingchain.constants import AgentType
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set the path to the prompts directory
-PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts')
+PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'prompts')
 prompt_manager = PromptManager(PROMPTS_DIR)
 
 
@@ -61,11 +55,17 @@ class Agent:
         ## deal with the prompt
         if prompt_template_name:
             self.template = prompt_manager.get_template(prompt_template_name)
+            if self.template is None:
+                logger.warning(f"Template '{prompt_template_name}' not found, using default")
+                self.template = PromptTemplate("Default template")
         elif prompt:
             self.template = PromptTemplate(prompt)
         else:
             # for tools etc
             self.template = prompt_manager.get_template('user_intent')
+            if self.template is None:
+                logger.warning(f"Default template 'user_intent' not found, using empty template")
+                self.template = PromptTemplate("Default template")
         
         ## deal with the memory manager
         if memory_manager is not None:
@@ -102,7 +102,11 @@ class Agent:
         
         # Get parameters from memory manager if available
         if self.memory_manager is not None:
-            parameters.update(self.memory_manager._construct_parameters())
+            if hasattr(self.memory_manager, 'construct_parameters'):
+                parameters.update(self.memory_manager.construct_parameters(placeholders))
+            else:
+                # Fallback to _construct_parameters if available
+                parameters.update(self.memory_manager._construct_parameters())
         
         # Add kwargs to the parameters
         parameters.update(kwargs)
@@ -120,8 +124,13 @@ class Agent:
 
     def _parse_results(self, results: Any) -> Dict[str, Any]:
         """
+        Parse the raw results into a structured format.
+        
+        Args:
+            results: The raw results to parse
+            
         Returns:
-            Dict[str, Any]: _description_
+            Dict[str, Any]: Parsed results as a dictionary
         """
         # format the results
         if isinstance(results, dict):
@@ -151,7 +160,7 @@ class Agent:
                     **self.metadata,
                 }
             } 
-            # Use memory manager to sav
+            # Use memory manager to save
             success = self.memory_manager.add_iteration(self.agent_type, data_with_metadata)
 
             if success:
@@ -206,41 +215,34 @@ class Agent:
     
     def _run(self, *args, **kwargs) -> Any:
         """
-        Agent-specific implementation of the run method.
-        
-        This method should be overridden by subclasses to implement
-        agent-specific functionality.
+        Agent-specific implementation to be overridden by subclasses.
         
         Args:
-            *args: Positional arguments passed from run
-            **kwargs: Keyword arguments passed from run
+            *args: Positional arguments
+            **kwargs: Keyword arguments
             
         Returns:
-            Dict[str, Any]: The results of running the agent
+            Any: Results of running the agent
+            
+        Raises:
+            NotImplementedError: If the subclass does not implement this method
         """
-        logger.warning(f"_run method not implemented in {self.__class__.__name__}")
-        return {
-            "warning": "Agent _run method not implemented",
-            "args": args,
-            "kwargs": kwargs
-        }
+        raise NotImplementedError("Subclasses must implement _run method")
     
     def set_next_step(self, next_step: Union[str, Callable, None]) -> None:
         """
-        Set the next step in the agent workflow.
+        Set the next step in the workflow.
         
         Args:
-            next_step: The next step to execute, can be a string identifier, 
-                      a callable function, or None
+            next_step: The next step to execute (string, function, or None)
         """
         self.next_step = next_step
-        logger.debug(f"Next step set to: {next_step}")
     
     def get_next_step(self) -> Union[str, Callable, None]:
         """
-        Get the next step in the agent workflow.
+        Get the next step in the workflow.
         
         Returns:
-            The next step to execute
+            Union[str, Callable, None]: The next step to execute
         """
         return self.next_step 

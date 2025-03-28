@@ -14,6 +14,8 @@ And after some thinking, searching and analysis, you already have some backgroun
 {summary}
 </past_knowledge>
 
+and you think your progess is {completeness_percent}% complete.
+
 But you still have some questions you want to answer:
 <current_question>
 {current_question}
@@ -28,7 +30,7 @@ And you got some last_step_result you can find it at last of this message, and y
 
 ## Steps
 
-1. *think*: Give a really brief summary of what you learned from last_step_result. Analyze the last_step_result, decide if you can answer the question based on the last_step_result, and what last_step_result can add to context. You should provide your thoughts in the thinking field.
+1. *think*: Give a really brief summary of what you learned from last_step_result. Analyze the last_step_result, decide if you can answer the question based on the last_step_result, and what last_step_result can add to context. You should provide your thoughts in the thinking field. Also please think about the overall goal and the knowledge you already gain in context, and with the new information from last_step_result, figure out a new completeness progress
 
 2. *Answer Questions*: Answer questions according to last_step_result. Make sure you provide the output in JSON format with a QA array containing question and answer objects. Each object should contain a question and answer field. The answer should be a paragraph in markdown format with source citation.
 
@@ -39,6 +41,7 @@ And you got some last_step_result you can find it at last of this message, and y
 1. For summary, you should thinking about past knowledge but do not include it in your summary. Instead you output should only based on the last_step_result and can be appendded to the past_knowledge.
 2. For answering questions, you can include both past and last_step_result in your answer.
 3. Answer question only if you get all information you need to answer the question.
+4. your new complete percentage should be no less the last complete percentage.
 
 ## Result from last step
 
@@ -51,13 +54,23 @@ And you got some last_step_result you can find it at last of this message, and y
 ``` json
 {
   "result": {
-    "thinking": "<!-- Insert thinking about last step result here -->",
-    "summary": "<!-- Insert summary of the findings here -->",
-    "QA": [
+    "thinking": "Insert thinking about last step result here",
+    "completeness_percent": "Insert completeness percent here",
+    "summary": "Insert summary of the findings here",
+    "questions": [
       {
-        "question": "{current_question}",
-        "answer": "<!-- Insert answer here -->"
+        "question": "Insert question that can be answered here",
+        "answer": "Insert answer here"
       }
+    ],
+    "status": "success or failure",
+    "links": [
+        {
+            "url": "Insert new link here",
+            "content": "summary of link content from search result",
+            "status": "pending"
+
+        }
     ]
   }
 }

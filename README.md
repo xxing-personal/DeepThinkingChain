@@ -232,3 +232,46 @@ deep-thinking-chain/
 ## License
 
 MIT
+
+## Installation
+
+### Local Installation
+
+To install the package locally in development mode, follow these steps:
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd DeepThinkingChain
+   ```
+
+2. Create and activate a virtual environment (optional but recommended):
+   ```bash
+   python -m venv venv
+   # On Windows
+   venv\Scripts\activate
+   # On macOS/Linux
+   source venv/bin/activate
+   ```
+
+3. Install the package in development mode:
+   ```bash
+   pip install -e .
+   ```
+
+4. Now you can import the package in your Python code:
+   ```python
+   from deepthinkingchain import DeepThinkingChain, Model, MemoryManager
+   ```
+
+### Dependencies
+
+The main dependencies for DeepThinkingChain include:
+- openai
+- requests
+- pydantic
+- dotenv
+- litellm (optional, for multi-provider support)
+- tqdm
+- beautifulsoup4
+- html2text

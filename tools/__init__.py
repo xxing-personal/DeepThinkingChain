@@ -9,12 +9,20 @@ Note: For web scraping and Google search functionality, a ScrapingDog API key is
 Set the SCRAPING_DOG_API_KEY environment variable to enable these features.
 """
 
-from tools.tool import Tool
-from tools.tool_manager import ToolManager
+import os
+import sys
+
+# Add parent directory to sys.path
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from .tool import Tool
+from .tool_manager import ToolManager
 
 # Import financial data tools
 try:
-    from tools.financial_data_tool import (
+    from .financial_data_tool import (
         FinancialDataTool,
         CompanyProfileTool,
         FinancialRatiosTool,
@@ -25,7 +33,7 @@ except ImportError:
 
 # Import web scraping tools
 try:
-    from tools.web_scraping_tool import (
+    from .web_scraping_tool import (
         WebScrapingTool,
         AdvancedWebScrapingTool
     )
@@ -34,7 +42,7 @@ except ImportError:
 
 # Import web search tools
 try:
-    from tools.web_search_tool import (
+    from .web_search_tool import (
         WebSearchTool,
         GoogleSearchTool,
         DuckDuckGoSearchTool,
@@ -45,7 +53,7 @@ except ImportError:
 
 # Import code execution tools
 try:
-    from tools.code_execution_tool import CodeExecutionTool
+    from .code_execution_tool import CodeExecutionTool
 except ImportError:
     pass
 
