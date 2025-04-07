@@ -29,13 +29,15 @@ And you gained some new insights from the last step result:
 {last_iteration}
 </last_iteration>
 
+and you think your progess is {completeness_percent}% complete.
 You task is to 1. plan the next step 2. raise new questions if you need
 
 ## Steps
 
-1. Reivew all background knowledge and current questions, think about what else do you need to reach the goal and fullfill the user intent. Include the thinking process in thinking part.
-2. Raise new questions if you need. The new questions should help you to reach the goal and fullfill the user intent. Include the new questions in question part
-3. you should think about **the next action**, you can search for more information, dig into existing url or decide to finish the task. you need to provide both the rational and the next tool call in the action part.  
+1. Reivew all background knowledge and current questions, think about what else do you need to reach the goal and fullfill the user intent. Include the thinking process in thinking part. 
+2. please think about the overall goal and the knowledge you already gain in context, and with the new information from last_step_result, figure out a new completeness progress
+3. Raise new questions if you need. The new questions should help you to reach the goal and fullfill the user intent. Include the new questions in question part
+4. you should think about **the next action**, you can search for more information, dig into existing url or decide to finish the task. you need to provide both the rational and the next tool call in the action part.  
     * **expand the knowledge**: You can use the search tool to conduct one more search. Include search query ready for parameter
     * **dig into the details of the current resources**. in this case you need to use the browse tool to get more information from the source. You can choose one of the existing links and use the browse tool to dig into the details. Include the link ready for parameter
     <links>
@@ -61,6 +63,7 @@ You task is to 1. plan the next step 2. raise new questions if you need
 {
   "result": {
     "thinking": "your thinking",
+    "completeness_percent": "% completeness progress",
     "question": ["new questions"],
     "rational": "rational for the next action", 
     "next_action": "next action to take"

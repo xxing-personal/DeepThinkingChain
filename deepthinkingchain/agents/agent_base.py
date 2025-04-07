@@ -102,11 +102,7 @@ class Agent:
         
         # Get parameters from memory manager if available
         if self.memory_manager is not None:
-            if hasattr(self.memory_manager, 'construct_parameters'):
-                parameters.update(self.memory_manager.construct_parameters(placeholders))
-            else:
-                # Fallback to _construct_parameters if available
-                parameters.update(self.memory_manager._construct_parameters())
+            parameters.update(self.memory_manager._construct_parameters())
         
         # Add kwargs to the parameters
         parameters.update(kwargs)

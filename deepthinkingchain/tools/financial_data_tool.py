@@ -582,7 +582,7 @@ def main():
     manager.set_default_tool("financial_data", "financial_data")
     
     # Print available tools
-    print(manager.get_tools_prompt())
+    print(manager.get_formatted_tools_description())
     
     # Check if API key is set
     api_key = os.getenv("FMP_API_KEY")

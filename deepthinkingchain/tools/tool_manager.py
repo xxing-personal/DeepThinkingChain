@@ -116,12 +116,58 @@ class ToolManager:
         """
         return self.default_tools
     
-    def get_tools_prompt(self) -> str:
+    def get_tool_descriptions(self) -> Dict[str, str]:
         """
-        Get a formatted prompt describing all available tools.
+        Get descriptions for all available tools as a dictionary.
         
         Returns:
-            String prompt describing all available tools
+            Dictionary mapping tool names to their descriptions
+        """
+        if not self.tools_by_name:
+            return {}
+        
+        # Create dictionary of tool descriptions
+        tool_descriptions = {}
+        for tool_name, tool in self.tools_by_name.items():
+            tool_descriptions[f"tool_{tool_name}"] = tool.description
+        
+        return tool_descriptions
+    
+    def get_tool_descriptions_by_category(self) -> Dict[str, Dict[str, str]]:
+        """
+        Get tool descriptions organized by category.
+        
+        Returns:
+            Dictionary with categories as keys and tool description dictionaries as values
+        """
+        if not self.tools_by_name:
+            return {}
+            
+        # Create dictionary of tool descriptions by category
+        categorized_tools = {}
+        
+        if self.tools_by_category:
+            # Handle categorized tools
+            for category, tool_names in self.tools_by_category.items():
+                category_tools = {}
+                for tool_name in tool_names:
+                    if tool_name in self.tools_by_name:
+                        category_tools[f"tool_{tool_name}"] = self.tools_by_name[tool_name].description
+                
+                if category_tools:
+                    categorized_tools[category] = category_tools
+        else:
+            # If no categories exist, use "general" category
+            categorized_tools["general"] = {f"tool_{name}": tool.description for name, tool in self.tools_by_name.items()}
+            
+        return categorized_tools
+    
+    def get_formatted_tools_description(self) -> str:
+        """
+        Get a human-readable formatted string describing all available tools.
+        
+        Returns:
+            String with formatted description of all available tools organized by category
         """
         prompt = "Available tools:\n\n"
         

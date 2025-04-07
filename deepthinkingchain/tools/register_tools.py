@@ -3,17 +3,17 @@
 Script to register all tools with the tool manager.
 """
 
-from tools.tool_manager import ToolManager
-from tools.financial_data_tool import FinancialDataTool
-from tools.web_search_tool import (
+from deepthinkingchain.tools.tool_manager import ToolManager
+from deepthinkingchain.tools.financial_data_tool import FinancialDataTool
+from deepthinkingchain.tools.web_search_tool import (
     GoogleSearchTool,
     DuckDuckGoSearchTool,
 )
-from tools.web_scraping_tool import (
+from deepthinkingchain.tools.web_scraping_tool import (
     WebScrapingTool,
     AdvancedWebScrapingTool
 )
-from tools.stock_valuation_tool import StockValuationTool
+from deepthinkingchain.tools.stock_valuation_tool import StockValuationTool
 
 def register_tools():
     """Register all tools with the tool manager."""
@@ -49,4 +49,4 @@ if __name__ == "__main__":
     manager = register_tools()
     
     # Print available tools
-    print(manager.get_tools_prompt()) 
+    print(manager.get_formatted_tools_description()) 
