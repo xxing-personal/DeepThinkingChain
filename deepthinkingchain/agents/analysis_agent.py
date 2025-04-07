@@ -45,196 +45,75 @@ class AnalysisAgent(Agent):
         # Set the agent type
         self.agent_type = AgentType.ANALYSIS
         
+        # Set the next step for this agent type
+        self.set_next_step("planning")
+        
         # Update metadata
         self.metadata.update({
             "agent_type": self.agent_type
         })
         
         # Initialize model for generating text
-        self.model = Model(model=model_name)
+        self.model = Model(model_name)
     
     def _run(self, last_step_result: Union[str, Dict[str, Any], None] = None) -> Dict[str, Any]:
-        """Run the analysis agent to analyze financial data and extract insights.
+        """Run the analysis on provided financial data.
         
         Args:
-            last_step_result: Data from the last step to be analyzed, either as formatted string or dict
+            last_step_result: Results from the previous step or raw data to analyze
             
         Returns:
-            A dictionary containing the analysis results
+            Dictionary containing the analysis results
         """
         try:
-            # Process the template using additional parameters from last step result
-            additional_params = {}
-            if last_step_result is not None:
-                if isinstance(last_step_result, dict):
-                    additional_params["last_step_result"] = format_data_for_prompt(last_step_result)
-                else:
-                    additional_params["last_step_result"] = str(last_step_result)
+            logger.info("Running analysis agent")
+            
+            # Format the last step result for inclusion in the prompt
+            if last_step_result is None:
+                last_step_result_str = "No previous data available."
+            elif isinstance(last_step_result, str):
+                last_step_result_str = last_step_result
+            elif isinstance(last_step_result, dict):
+                last_step_result_str = format_data_for_prompt(last_step_result)
             else:
-                additional_params["last_step_result"] = "No previous results available."
+                # Try to convert to string if not a recognized type
+                last_step_result_str = str(last_step_result)
                 
-            # Process the template
-            prompt = self.process_template(**additional_params)
+            # Process the template with the formatted last step result
+            prompt = self.process_template(last_step_result=last_step_result_str)
             
-            # Use the Model class to analyze the data
-            response = self.model.generate(
-                prompt=prompt,
-            )
+            # Generate analysis using the model
+            response = self.model.generate_json(prompt=prompt)
             
-            # Parse the response
-            return self._parse_response(response)
+            # Ensure we have the expected result structure
+            if not isinstance(response, dict):
+                logger.warning(f"Expected dict response, got {type(response)}")
+                # Convert to dict if possible
+                if hasattr(response, '__dict__'):
+                    response = response.__dict__
+                else:
+                    response = {"error": "Invalid response format"}
+            
+            # Ensure we have a result key
+            if "result" not in response:
+                response = {"result": response}
                 
+            # Add metadata
+            response["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            response["agent_type"] = self.agent_type
+            
+            # Store next step from response if available
+            if "next_step" in response:
+                self.set_next_step(response["next_step"])
+                
+            return response
+            
         except Exception as e:
             logger.error(f"Error during analysis: {str(e)}")
-            
-            # Return an error result
             return {
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "error": str(e),
-                "status": "failed"
-            }
-    
-    def _parse_response(self, response: str) -> Dict[str, Any]:
-        """Parse the response from the model into a structured format that matches the expected template.
-        
-        Args:
-            response: The string response from the model
-            
-        Returns:
-            A dictionary containing the structured analysis results
-        """
-        try:
-            # Look for JSON content in the response
-            json_start = response.find('{')
-            json_end = response.rfind('}')
-            
-            if json_start != -1 and json_end != -1:
-                json_str = response[json_start:json_end+1]
-                try:
-                    parsed_data = json.loads(json_str)
-                    
-                    # Extract the main result content
-                    if "result" in parsed_data:
-                        result = parsed_data["result"]
-                    else:
-                        result = parsed_data
-                                        
-                    # Check for completeness percentage and ensure it's a number
-                    if "completeness_percent" in result:
-                        try:
-                            # Convert string percentage to number if needed
-                            if isinstance(result["completeness_percent"], str):
-                                # Remove % sign if present
-                                result["completeness_percent"] = result["completeness_percent"].replace("%", "").strip()
-                                result["completeness_percent"] = float(result["completeness_percent"])
-                        except ValueError:
-                            logger.warning("Could not parse completeness_percent as a number")
-                            result["completeness_percent"] = 0
-                    
-                    # Update memory with this result if a memory manager is available
-                    if hasattr(self, 'memory_manager') and self.memory_manager is not None:
-                        self.memory_manager.add_iteration(self.agent_type, {
-                            "analysis_result": result,
-                            "timestamp": result["timestamp"],
-                            "agent_type": self.agent_type
-                        })
-                        logger.info("Added analysis result to memory")
-                    
-                    return result
-                except json.JSONDecodeError as e:
-                    logger.error(f"Error parsing JSON: {str(e)}")
-                    # Fall back to text parsing
-            
-            # If JSON parsing failed, create a basic structure
-            logger.warning("JSON parsing failed, creating basic structure")
-            result = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "status": "partial_success",
-                "raw_response": response,
-                "thinking": "Analysis completed, but structured output was not available.",
-                "summary": response[:500] + "..." if len(response) > 500 else response,
-                "completeness_percent": 0,
-                "questions": []
+                "agent_type": self.agent_type,
+                "status": "error"
             }
-            
-            # Update memory with this partial result if a memory manager is available
-            if hasattr(self, 'memory_manager') and self.memory_manager is not None:
-                self.memory_manager.add_iteration(self.agent_type, {
-                    "analysis_result": result,
-                    "timestamp": result["timestamp"],
-                    "agent_type": self.agent_type
-                })
-                logger.info("Added partial analysis result to memory")
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error parsing response: {str(e)}")
-            error_result = {
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "error": f"Failed to parse response: {str(e)}",
-                "raw_response": response,
-                "status": "failed"
-            }
-            
-            # Still try to update memory with error information
-            if hasattr(self, 'memory_manager') and self.memory_manager is not None:
-                try:
-                    self.memory_manager.add_iteration(self.agent_type, {
-                        "analysis_result": error_result,
-                        "timestamp": error_result["timestamp"],
-                        "agent_type": self.agent_type,
-                        "error": str(e)
-                    })
-                    logger.info("Added error information to memory")
-                except Exception as mem_err:
-                    logger.error(f"Failed to update memory with error: {str(mem_err)}")
-            
-            return error_result
-                
-    def analyze(self, data: Dict[str, Any], focus: str = "general", symbol: str = None) -> Dict[str, Any]:
-        """Public method to analyze financial data with a specific focus.
-        
-        Args:
-            data: Dictionary containing the financial data to analyze
-            focus: The focus area of the analysis (e.g., "financial_performance", "competitive_analysis")
-            symbol: Optional stock symbol being analyzed
-            
-        Returns:
-            A dictionary containing the analysis results
-        """
-        try:
-            # Add focus and symbol to the data if provided
-            if focus:
-                data["focus"] = focus
-            if symbol:
-                data["symbol"] = symbol
-                
-            # Run the analysis
-            results = self.run(data)
-            
-            # Make sure timestamp is in the results
-            if "timestamp" not in results:
-                results["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                
-            # Make sure analysis_type is set based on focus
-            if "analysis_type" not in results:
-                results["analysis_type"] = focus
-                
-            # Make sure symbol is included 
-            if symbol and "symbol" not in results:
-                results["symbol"] = symbol
-                
-            return results
-            
-        except Exception as e:
-            logger.error(f"Error during analyze call: {str(e)}")
-            
-            # Return basic error structure
-            return {
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "analysis_type": focus,
-                "symbol": symbol,
-                "error": str(e),
-                "status": "failed"
-            } 
+ 

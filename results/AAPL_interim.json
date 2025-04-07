@@ -1,0 +1,11 @@
+{
+  "symbol": "AAPL",
+  "iteration": 1,
+  "analyses": [
+    {
+      "result": "success",
+      "model": "openai/o3-mini",
+      "response": "Stub response from openai/o3-mini",
+      "prompt_length": 16,
+      "timestamp": "2025-04-07 16:41:54",
+      "agent_type": 

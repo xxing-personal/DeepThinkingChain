@@ -52,283 +52,136 @@ class DeepThinkingChain:
         # Update memory with max iterations
         self.memory_manager.update_memory({"max_iterations": max_iterations})
     
-    def run(self) -> str:
-        """Runs the iterative deep thinking workflow, coordinating agents, and storing context.
+    def run(self, verbose: bool = True) -> Dict[str, Any]:
+        """Run the Deep Thinking Chain analysis workflow.
         
-        This method implements the full Deep Thinking Chain workflow:
-        1. Tool Agent fetches financial data
-        2. Analysis Agent analyzes the data
-        3. Planning Agent determines next steps
-        4. Loop continues until analysis is complete or max iterations reached
-        5. Summarization Agent generates final investment summary
+        This method orchestrates the multi-agent workflow by:
+        1. Starting with the Analysis agent
+        2. Alternating between Analysis, Planning and Tool agents as needed
+        3. Finishing with the Summarization agent
+        
+        Args:
+            verbose: Whether to print progress to console
         
         Returns:
-            str: Path to the final summary file
+            Dict containing the final analysis results
         """
-        print(f"🔍 Starting Deep Thinking Chain analysis for {self.symbol}...")
+        if verbose:
+            print(f"Starting Deep Thinking Chain analysis for {self.symbol}")
+            
+        start_time = datetime.now()
+        self.iteration = 0
+        current_step = "analysis"  # Start with analysis agent
+        last_result = None
         
-        # Get memory state
-        memory = self.memory_manager.get_memory()
-        
-        # Initialize variables from memory
-        self.iteration = len(memory.get("iterations", []))
-        current_focus = memory.get("current_focus", "financial_performance")
-        completed_focus_areas = memory.get("completed_focus_areas", [])
-        
-        # Load any existing analyses from memory
-        for iteration in memory.get("iterations", []):
-            if "analysis" in iteration:
-                self.analyses.append(iteration["analysis"])
-        
-        continue_analysis = True
-        while continue_analysis and self.iteration < self.max_iterations:
+        # Main workflow loop
+        while self.iteration < self.max_iterations:
             self.iteration += 1
-            print(f"\n📊 Iteration {self.iteration}/{self.max_iterations}")
             
-            # Step 1: Tool Agent - Fetch data based on current focus
-            print(f"🔧 Tool Agent: Fetching data for {self.symbol} with focus on {current_focus}...")
+            if verbose:
+                print(f"\nIteration {self.iteration}/{self.max_iterations}: Running {current_step}")
             
-            try:
-                if self.iteration == 1 or current_focus == "financial_performance":
-                    # First iteration or financial focus: get company profile and basic financials
-                    data = {
-                        "symbol": self.symbol,
-                        "company_profile": self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol),
-                        "financial_ratios": self.tool_agent.execute_tool("fetch_financial_ratios", symbol=self.symbol),
-                        "income_statement": self.tool_agent.execute_tool("fetch_income_statement", symbol=self.symbol, limit=2),
-                        "balance_sheet": self.tool_agent.execute_tool("fetch_balance_sheet", symbol=self.symbol, limit=2),
-                        "cash_flow": self.tool_agent.execute_tool("fetch_cash_flow", symbol=self.symbol, limit=2)
-                    }
-                elif current_focus == "competitive_analysis":
-                    # Competitive analysis: get peer companies and comparison data
-                    data = {
-                        "symbol": self.symbol,
-                        "company_profile": self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol),
-                        "peers": self.tool_agent.execute_tool("fetch_peers", symbol=self.symbol),
-                        "peer_ratios": self.tool_agent.execute_tool("fetch_peer_ratios", symbol=self.symbol),
-                        "market_share": self.tool_agent.execute_tool("fetch_market_share", symbol=self.symbol)
-                    }
-                elif current_focus == "growth_prospects":
-                    # Growth analysis: get growth estimates and future projections
-                    data = {
-                        "symbol": self.symbol,
-                        "company_profile": self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol),
-                        "growth_estimates": self.tool_agent.execute_tool("fetch_growth_estimates", symbol=self.symbol),
-                        "analyst_recommendations": self.tool_agent.execute_tool("fetch_analyst_recommendations", symbol=self.symbol),
-                        "earnings_surprises": self.tool_agent.execute_tool("fetch_earnings_surprises", symbol=self.symbol)
-                    }
-                elif current_focus == "risk_assessment":
-                    # Risk assessment: get volatility, debt, and risk factors
-                    data = {
-                        "symbol": self.symbol,
-                        "company_profile": self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol),
-                        "financial_ratios": self.tool_agent.execute_tool("fetch_financial_ratios", symbol=self.symbol),
-                        "sec_filings": self.tool_agent.execute_tool("fetch_sec_filings", symbol=self.symbol, limit=5),
-                        "price_volatility": self.tool_agent.execute_tool("fetch_price_volatility", symbol=self.symbol)
-                    }
-                else:
-                    # Default: get data based on planning agent's focus
-                    data = {"symbol": self.symbol}
-                    # Use execute_tool for each data type needed for this focus
-                    data["company_profile"] = self.tool_agent.execute_tool("fetch_company_profile", symbol=self.symbol)
-                    # Add more data types as needed based on the focus
-                
-                # Check for errors in the data
-                if any("error" in str(value) for key, value in data.items() if key != "symbol"):
-                    print(f"⚠️ Warning: Some data could not be fetched. Continuing with available data.")
-            
-            except Exception as e:
-                print(f"⚠️ Error fetching data: {str(e)}")
-                data = {"symbol": self.symbol, "error": str(e)}
-            
-            # Step 2: Analysis Agent - Analyze data
-            print(f"🧠 Analysis Agent: Analyzing {current_focus} data...")
-            try:
-                analysis_result = self.analysis_agent.analyze(data, focus=current_focus, symbol=self.symbol)
-                
-                # Add to analyses list
+            # Execute the current step based on the workflow
+            if current_step == "analysis":
+                # Run analysis agent
+                analysis_result = self.analysis_agent.run(last_result)
+                last_result = analysis_result
                 self.analyses.append(analysis_result)
                 
-                # Print analysis summary
-                print(f"📊 Analysis complete: {analysis_result.get('sentiment', 'N/A')} sentiment with {analysis_result.get('confidence', 'N/A')} confidence")
-                print(f"🔑 Key points:")
-                for point in analysis_result.get("key_points", [])[:3]:
-                    print(f"  • {point}")
-                if len(analysis_result.get("key_points", [])) > 3:
-                    print(f"  • ... and {len(analysis_result.get('key_points', [])) - 3} more points")
+                # Store the analysis in memory
+                self.memory_manager.add_iteration(AgentType.ANALYSIS, analysis_result)
+                
+                # Get the next step from the agent
+                current_step = self.analysis_agent.get_next_step()
+                
+            elif current_step == "planning":
+                # Run planning agent to determine next steps
+                planning_result = self.planning_agent.run(last_result)
+                last_result = planning_result
+                
+                # Store the planning result in memory
+                self.memory_manager.add_iteration(AgentType.PLANNING, planning_result)
+                
+                # Get the next step from the agent
+                current_step = self.planning_agent.get_next_step()
+                
+                # Check if we should continue or finish
+                if current_step == "finish" or not planning_result.get("continue_analysis", True):
+                    break
+                    
+            elif current_step == "tool":
+                # Run tool agent to gather information
+                tool_result = self.tool_agent.run(last_result)
+                last_result = tool_result
+                
+                # Store the tool result in memory
+                self.memory_manager.add_iteration(AgentType.TOOL, tool_result)
+                
+                # Get the next step from the agent
+                current_step = self.tool_agent.get_next_step()
+                
+            elif current_step == "summary":
+                # Skip to summary phase
+                break
+                
+            else:
+                if verbose:
+                    print(f"Unknown step: {current_step}. Defaulting to analysis.")
+                current_step = "analysis"
+                
+            # Optional: Save interim results
+            self._save_interim_results()
             
-            except Exception as e:
-                print(f"⚠️ Error during analysis: {str(e)}")
-                analysis_result = {
-                    "analysis_type": current_focus,
-                    "symbol": self.symbol,
-                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "error": str(e),
-                    "insights": f"Error during analysis: {str(e)}",
-                    "key_points": ["Analysis failed due to an error"],
-                    "sentiment": "neutral",
-                    "confidence": "low"
-                }
-                self.analyses.append(analysis_result)
+        # Run final summarization
+        if verbose:
+            print("\nGenerating final summary...")
             
-            # Store iteration results in memory
-            iteration_memory = {
+        summary_result = self.summarization_agent.generate_summary(
+            symbol=self.symbol,
+            analyses=self.analyses,
+            iterations=self.iteration
+        )
+        
+        # Store the summary in memory
+        self.memory_manager.add_iteration(AgentType.SUMMARY, summary_result)
+        
+        # Save final results
+        final_results = {
+            "symbol": self.symbol,
+            "iterations": self.iteration,
+            "analyses": self.analyses,
+            "summary": summary_result,
+            "start_time": start_time.isoformat(),
+            "end_time": datetime.now().isoformat(),
+            "execution_time_seconds": (datetime.now() - start_time).total_seconds()
+        }
+        
+        self._save_final_results(final_results)
+        
+        if verbose:
+            print(f"\nAnalysis complete. Performed {self.iteration} iterations.")
+            print(f"Results saved to: results/{self.symbol}_analysis.json")
+            
+        return final_results
+    
+    def _save_interim_results(self) -> None:
+        """Save intermediate results after each iteration."""
+        interim_file = f"results/{self.symbol}_interim.json"
+        with open(interim_file, 'w') as f:
+            json.dump({
+                "symbol": self.symbol,
                 "iteration": self.iteration,
-                "focus": current_focus,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "data_keys": list(data.keys()),
-                "analysis": analysis_result,
-                "thinking": f"Analysis of {current_focus} for iteration {self.iteration}"
-            }
-            
-            # Update memory with iteration data
-            self.memory_manager.add_iteration(AgentType.ANALYSIS, iteration_memory)
-            
-            # Update focus area in memory
-            self.memory_manager.update_focus_area(current_focus, completed=True)
-            
-            # Get updated completion percentage
-            memory = self.memory_manager.get_memory()
-            completion = memory.get("completion_percentage", 0)
-            print(f"📈 Analysis progress: {completion}% complete")
-            
-            # Step 3: Planning Agent - Determine next steps
-            print("📝 Planning Agent: Determining next steps...")
-            try:
-                # Get latest memory state for planning
-                memory = self.memory_manager.get_memory()
-                
-                planning_result = self.planning_agent.plan_next(
-                    analysis_result=analysis_result,
-                    iteration=self.iteration,
-                    max_iterations=self.max_iterations,
-                    completed_focus_areas=memory.get("completed_focus_areas", []),
-                    required_focus_areas=memory.get("required_focus_areas", [])
-                )
-                
-                # Update memory with planning results
-                current_focus = planning_result.get("next_focus")
-                self.memory_manager.update_memory({
-                    "current_focus": current_focus,
-                    "planning_reasoning": planning_result.get("reasoning")
-                })
-                
-                # Check if we should continue or move to summarization
-                continue_analysis = planning_result.get("continue_analysis", False)
-                
-                # Print planning decision
-                if continue_analysis:
-                    print(f"🔄 Planning decision: Continue analysis with focus on {planning_result.get('next_focus')}")
-                    print(f"💡 Reasoning: {planning_result.get('reasoning')}")
-                else:
-                    print("✅ Planning decision: Analysis complete. Moving to summarization...")
-                    print(f"💡 Reasoning: {planning_result.get('reasoning')}")
-            
-            except Exception as e:
-                print(f"⚠️ Error during planning: {str(e)}")
-                # Default to continuing with a different focus area if possible
-                memory = self.memory_manager.get_memory()
-                completed_areas = memory.get("completed_focus_areas", [])
-                required_areas = memory.get("required_focus_areas", [])
-                
-                # Find an uncompleted required area
-                next_focus = None
-                for area in required_areas:
-                    if area not in completed_areas:
-                        next_focus = area
-                        break
-                
-                # If all required areas are completed or we've reached max iterations, stop
-                if not next_focus or self.iteration >= self.max_iterations:
-                    continue_analysis = False
-                    print("✅ Moving to summarization due to planning error or completion...")
-                else:
-                    continue_analysis = True
-                    current_focus = next_focus
-                    self.memory_manager.update_memory({"current_focus": next_focus})
-                    print(f"🔄 Continuing with focus on {next_focus} (default decision due to error)")
+                "analyses": self.analyses,
+                "timestamp": datetime.now().isoformat()
+            }, f, indent=2)
+    
+    def _save_final_results(self, results: Dict[str, Any]) -> None:
+        """Save the final analysis results to a JSON file.
         
-        # Step 4: Summarization Agent - Generate final summary
-        print("📋 Summarization Agent: Generating investment summary...")
-        try:
-            # Generate the summary
-            summary = self.summarization_agent.generate_summary(symbol=self.symbol, analyses=self.analyses, iterations=self.iteration)
-            
-            # Save summary to results directory
-            summary_file = f"results/{self.symbol}_summary.md"
-            with open(summary_file, 'w') as f:
-                f.write(summary)
-            
-            # Update memory with completion information
-            self.memory_manager.update_memory({
-                "completion_time": datetime.now().isoformat(),
-                "completion_percentage": 100,
-                "summary_file": summary_file
-            })
-            
-            print(f"🎉 Analysis complete! Summary saved to {summary_file}")
-            return summary_file
-        
-        except Exception as e:
-            print(f"⚠️ Error generating summary: {str(e)}")
-            
-            # Create a basic summary with available information
-            basic_summary = f"# Investment Summary for {self.symbol}\n\n"
-            basic_summary += f"## Analysis Overview\n\n"
-            basic_summary += f"* Symbol: {self.symbol}\n"
-            basic_summary += f"* Analysis Date: {datetime.now().strftime('%Y-%m-%d')}\n"
-            basic_summary += f"* Iterations Completed: {self.iteration}\n\n"
-            
-            basic_summary += "## Analysis Results\n\n"
-            for i, analysis in enumerate(self.analyses):
-                basic_summary += f"### Analysis {i+1}: {analysis.get('analysis_type', 'Unknown')}\n\n"
-                basic_summary += f"* Sentiment: {analysis.get('sentiment', 'N/A')}\n"
-                basic_summary += f"* Confidence: {analysis.get('confidence', 'N/A')}\n\n"
-                
-                if "key_points" in analysis and analysis["key_points"]:
-                    basic_summary += "Key Points:\n\n"
-                    for point in analysis["key_points"]:
-                        basic_summary += f"* {point}\n"
-                    basic_summary += "\n"
-            
-            basic_summary += "\n## Error Information\n\n"
-            basic_summary += f"An error occurred during the summarization process: {str(e)}\n"
-            
-            # Save basic summary
-            summary_file = f"results/{self.symbol}_basic_summary.md"
-            with open(summary_file, 'w') as f:
-                f.write(basic_summary)
-            
-            # Update memory with error information
-            self.memory_manager.update_memory({
-                "completion_time": datetime.now().isoformat(),
-                "completion_percentage": 90,
-                "summary_file": summary_file,
-                "summary_error": str(e)
-            })
-            
-            print(f"⚠️ Error in summarization. Basic summary saved to {summary_file}")
-            return summary_file
-
-
-if __name__ == "__main__":
-    import sys
-    
-    if len(sys.argv) > 1:
-        symbol = sys.argv[1]
-    else:
-        symbol = input("Enter stock symbol to analyze (e.g., NVDA): ")
-    
-    # Optional: Allow specifying max iterations
-    max_iterations = 5
-    if len(sys.argv) > 2:
-        try:
-            max_iterations = int(sys.argv[2])
-        except ValueError:
-            print(f"Invalid max iterations value. Using default: {max_iterations}")
-    
-    # Run the analysis
-    chain = DeepThinkingChain(symbol, max_iterations=max_iterations)
-    summary_file = chain.run()
-    
-    print(f"\nTo view results: cat {summary_file}") 
+        Args:
+            results: The results dictionary to save
+        """
+        results_file = f"results/{self.symbol}_analysis.json"
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=2)
+  

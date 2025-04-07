@@ -42,6 +42,10 @@ class Model:
             model: Model identifier (provider/model_name)
             **kwargs: Additional arguments to pass to the underlying model
         """
+        # Use default model if None is provided
+        if model is None:
+            model = "openai/o3-mini"
+            
         self.model_id = model
         self.config = kwargs
         logger.info(f"Initialized Model with {model}")

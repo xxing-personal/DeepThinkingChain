@@ -50,17 +50,26 @@ class PlanningAgent(Agent):
         })
         
         # Initialize model for generating text
-        self.model = Model(model=model_name)
+        self.model = Model(model_name)
         
         # Store tool manager for access to tools
         self.tool_manager = tool_manager
         
-        # get existing 
-        self.initial_completeness_percent = self.memory_manager.get_completeness_percent()
+        # Initialize iteration counter
+        self.iteration = 0
+        
+        # get existing completeness percentage
+        if self.memory_manager is not None:
+            self.initial_completeness_percent = self.memory_manager.get_completeness_percent()
+        else:
+            self.initial_completeness_percent = 0.0
     
-    def _run(self) -> Dict[str, Any]:
+    def _run(self, last_step_result: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Run the planning process to determine next steps.
         
+        Args:
+            last_step_result: The results from the previous step (usually analysis)
+            
         Returns:
             Dictionary containing the planning results
         """
@@ -71,9 +80,10 @@ class PlanningAgent(Agent):
             if self.tool_manager:
                 tool_descriptions = self.tool_manager.get_tool_descriptions()
             
-            # Add tool descriptions to template parameters
+            # Add tool descriptions and last step results to template parameters
             template_params = {
-                "tools": tool_descriptions
+                "tools": tool_descriptions,
+                "last_result": last_step_result
             }
                 
             # Process the template with parameters
@@ -180,6 +190,23 @@ class PlanningAgent(Agent):
                 logger.info(f"Added {result['status']} planning result to memory")
             except Exception as mem_err:
                 logger.error(f"Failed to update memory with result: {str(mem_err)}")
+        
+        # Set the next step based on the planning output
+        next_action = result.get("next_action", "").lower()
+        continue_analysis = result.get("continue_analysis", True)
+        
+        if not continue_analysis or next_action == "finish":
+            # If analysis is complete, set next step to summarization
+            self.set_next_step("summary")
+        else:
+            # If analysis should continue, set appropriate next step based on next_action
+            if next_action in ["tool", "tools"]:
+                self.set_next_step("tool")
+            else:
+                # Default to analysis for continuing the process
+                self.set_next_step("analysis")
+                
+        logger.info(f"Planning agent set next step to: {self.get_next_step()}")
         
         return result
     

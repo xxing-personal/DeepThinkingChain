@@ -5,7 +5,7 @@ This module contains the ToolManager class for managing tools.
 """
 
 from typing import Dict, Any, List, Optional, Type
-from tools.tool import Tool
+from deepthinkingchain.tools.tool import Tool
 
 class ToolManager:
     """Manager for registering and retrieving tools."""
@@ -32,6 +32,17 @@ class ToolManager:
         
         if tool.name not in self.tools_by_category[tool.category]:
             self.tools_by_category[tool.category].append(tool.name)
+    
+    def register_tool(self, tool: Tool) -> None:
+        """
+        Register a tool with the manager.
+        
+        This is an alias for add_tool for more intuitive naming.
+        
+        Args:
+            tool: The tool to register
+        """
+        self.add_tool(tool)
     
     def get_tool_by_name(self, name: str) -> Optional[Tool]:
         """

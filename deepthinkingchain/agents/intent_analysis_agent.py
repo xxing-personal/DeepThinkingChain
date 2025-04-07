@@ -33,6 +33,9 @@ class IntentAnalysisAgent(Agent):
         # Set the agent type
         self.agent_type = AgentType.USER_INTENT
         
+        # Set the next step for this agent type
+        self.set_next_step("planning")
+        
         # Update metadata
         self.metadata.update({
             "agent_type": self.agent_type
@@ -85,14 +88,3 @@ class IntentAnalysisAgent(Agent):
                 "error": str(e),
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
             }
-    
-    def analyze_intent(self, user_input: str) -> Dict[str, Any]:
-        """Public method to analyze user intent from input text.
-        
-        Args:
-            user_input: The user's input text to analyze
-            
-        Returns:
-            Dictionary containing the detected intent and parameters
-        """
-        return self.run(user_input) 

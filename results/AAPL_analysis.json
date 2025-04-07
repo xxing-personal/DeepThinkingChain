@@ -1,0 +1,44 @@
+{
+  "symbol": "AAPL",
+  "iterations": 2,
+  "analyses": [
+    {
+      "timestamp": "2025-04-07 16:35:28",
+      "symbol": "UNKNOWN",
+      "analysis_type": "financial",
+      "metrics": {
+        "sentiment": "positive",
+        "confidence": 0.85,
+        "risk_score": 0.3
+      },
+      "insights": [
+        "Strong quarterly earnings exceed analyst expectations",
+        "Increased market share in core product segments",
+        "Robust growth in international markets"
+      ],
+      "areas_of_concern": [
+        "Potential supply chain disruptions",
+        "Increasing competition in secondary markets"
+      ],
+      "recommendation": "BUY",
+      "recommendation_strength": "high",
+      "run_at": 1744068928.8819158,
+      "execution_time": 4.8160552978515625e-05
+    }
+  ],
+  "summary": {
+    "timestamp": "2025-04-07 16:35:28",
+    "summary": "Summary of 1 analyses (stub implementation)",
+    "recommendation": "HOLD",
+    "confidence": "medium",
+    "key_points": [
+      "This is a stub implementation",
+      "Real implementation would analyze all results"
+    ],
+    "run_at": 1744068928.882499,
+    "execution_time": 2.5987625122070312e-05
+  },
+  "start_time": "2025-04-07T16:35:28.881908",
+  "end_time": "2025-04-07T16:35:28.882750",
+  "execution_time_seconds": 0.000843
+}

@@ -41,10 +41,10 @@ class Agent:
             prompt: The actual template string if the user is not using prompt_manager
             memory_manager: Optional memory manager for saving agent results
         """
-        self.next_step = None
         self.model_name = model_name
         self.results = {}
         self.agent_type = AgentType.GENERIC
+        self.next_step = None
         
         self.metadata = {
             "agent_name": self.__class__.__name__,
@@ -81,7 +81,6 @@ class Agent:
                 raise ValueError(f"Memory must be a MemoryManager instance, a path to a memory JSON file, or None, got {type(memory_manager)}")
         else:
             self.memory_manager = None
-
 
     def process_template(self, **kwargs) -> str:
         """

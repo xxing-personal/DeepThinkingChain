@@ -32,6 +32,9 @@ class SummarizationAgent(Agent):
         # Set the agent type
         self.agent_type = AgentType.SUMMARY
         
+        # Set the next step for this agent type
+        self.set_next_step("finish")
+        
         # Update metadata
         self.metadata.update({
             "agent_type": self.agent_type

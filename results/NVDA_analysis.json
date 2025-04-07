@@ -1,0 +1,67 @@
+{
+  "symbol": "NVDA",
+  "iterations": 3,
+  "analyses": [
+    {
+      "timestamp": "2025-04-07 16:36:02",
+      "symbol": "UNKNOWN",
+      "analysis_type": "financial",
+      "metrics": {
+        "sentiment": "positive",
+        "confidence": 0.85,
+        "risk_score": 0.3
+      },
+      "insights": [
+        "Strong quarterly earnings exceed analyst expectations",
+        "Increased market share in core product segments",
+        "Robust growth in international markets"
+      ],
+      "areas_of_concern": [
+        "Potential supply chain disruptions",
+        "Increasing competition in secondary markets"
+      ],
+      "recommendation": "BUY",
+      "recommendation_strength": "high",
+      "run_at": 1744068962.700684,
+      "execution_time": 4.1961669921875e-05
+    },
+    {
+      "timestamp": "2025-04-07 16:36:02",
+      "symbol": "UNKNOWN",
+      "analysis_type": "financial",
+      "metrics": {
+        "sentiment": "positive",
+        "confidence": 0.85,
+        "risk_score": 0.3
+      },
+      "insights": [
+        "Strong quarterly earnings exceed analyst expectations",
+        "Increased market share in core product segments",
+        "Robust growth in international markets"
+      ],
+      "areas_of_concern": [
+        "Potential supply chain disruptions",
+        "Increasing competition in secondary markets"
+      ],
+      "recommendation": "BUY",
+      "recommendation_strength": "high",
+      "run_at": 1744068962.700684,
+      "execution_time": 4.1961669921875e-05
+    }
+  ],
+  "summary": {
+    "timestamp": "2025-04-07 16:36:02",
+    "summary": "Summary of 2 analyses (stub implementation)",
+    "recommendation": "HOLD",
+    "confidence": "medium",
+    "key_points": [
+      "This is a stub implementation",
+      "Real implementation would analyze all results"
+    ],
+    "run_at": 1744068962.700944,
+    "execution_time": 3.0040740966796875e-05
+  },
+  "start_time": "2025-04-07T16:36:02.699366",
+  "end_time": "2025-04-07T16:36:02.701065",
+  "execution_time_seconds": 0.0017
+}

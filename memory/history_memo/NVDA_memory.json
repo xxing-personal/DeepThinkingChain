@@ -1,0 +1,17 @@
+{
+  "id": "NVDA",
+  "name": "NVDA",
+  "iteration_counter": 0,
+  "max_iterations": 3,
+  "user_intent": "",
+  "iterations": [
+    "3_1: \ntimestamp: 2025-04-07 16:36:02/n symbol: UNKNOWN/n analysis_type: financial/n metrics: {'sentiment': 'positive', 'confidence': 0.85, 'risk_score': 0.3}/n insights: ['Strong quarterly earnings exceed analyst expectations', 'Increased market share in core product segments', 'Robust growth in international markets']/n areas_of_concern: ['Potential supply chain disruptions', 'Increasing competition in secondary markets']/n recommendation: BUY/n recommendation_strength: high/n run_at: 1744068962.699376/n execution_time: 5.5789947509765625e-05",
+    "4_2: \ntimestamp: 2025-04-07 16:36:02/n continue_analysis: True/n reasoning: Fallback planning logic due to missing JSON content/n questions: []/n next_action: None/n status: partial_success/n completion_percentage: 0.0/n raw_response: This is a stub response from openai/o3-mini for prompt: Default template.../n run_at: 1744068962.700424/n execution_time: 6.508827209472656e-05",
+    "3_3: \ntimestamp: 2025-04-07 16:36:02/n symbol: UNKNOWN/n analysis_type: financial/n metrics: {'sentiment': 'positive', 'confidence': 0.85, 'risk_score': 0.3}/n insights: ['Strong quarterly earnings exceed analyst expectations', 'Increased market share in core product segments', 'Robust growth in international markets']/n areas_of_concern: ['Potential supply chain disruptions', 'Increasing competition in secondary markets']/n recommendation: BUY/n recommendation_strength: high/n run_at: 1744068962.700684/n execution_time: 4.1961669921875e-05",
+    "5_4: \ntimestamp: 2025-04-07 16:36:02/n summary: Summary of 2 analyses (stub implementation)/n recommendation: HOLD/n confidence: medium/n key_points: ['This is a stub implementation', 'Real implementation would analyze all results']/n run_at: 1744068962.700944/n execution_time: 3.0040740966796875e-05"
+  ],
+  "completion_percentage": 0,
+  "questions": [],
+  "links": [],
+  "summary": "Summary of 2 analyses (stub implementation)"
+}

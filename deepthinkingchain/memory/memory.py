@@ -239,7 +239,7 @@ class MemoryManager:
         
         return self.memory
     
-     def add_iteration(self, iteration_type: AgentType, iteration_data: Dict[str, Any]) -> Dict[str, Any]:
+    def add_iteration(self, iteration_type: AgentType, iteration_data: Dict[str, Any]) -> Dict[str, Any]:
         """Add a new iteration to the memory.
         
         Args:
@@ -265,7 +265,7 @@ class MemoryManager:
             else:
                 thinking_str = full_result
 
-        self.memory["iterations"].append(iteration_type.value + "_" + str(self.iteration_counter) + ": \n" + thinking_str)
+        self.memory["iterations"].append(str(iteration_type.value) + "_" + str(self.iteration_counter) + ": \n" + thinking_str)
 
         # update user intent
         if 'user_intent' in iteration_data:
