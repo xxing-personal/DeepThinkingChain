@@ -19,15 +19,16 @@ logger = logging.getLogger(__name__)
 class SummarizationAgent(Agent):
     """Agent for summarizing analysis results and generating final reports."""
     
-    def __init__(self, prompt_template_name: str = "summarization", model_name: str = None):
+    def __init__(self, prompt_template_name: str = "summarization", model_name: str = None, memory_manager=None):
         """Initialize the SummarizationAgent.
         
         Args:
             prompt_template_name: Name of the template to use (defaults to "summarization")
             model_name: Name of the model to use
+            memory_manager: Optional memory manager for saving agent results
         """
         # Initialize the base Agent class
-        super().__init__(prompt_template_name=prompt_template_name, model_name=model_name)
+        super().__init__(prompt_template_name=prompt_template_name, model_name=model_name, memory_manager=memory_manager)
         
         # Set the agent type
         self.agent_type = AgentType.SUMMARY
@@ -66,15 +67,15 @@ class SummarizationAgent(Agent):
             "key_points": ["This is a stub implementation", "Real implementation would analyze all results"]
         }
     
-    def generate_summary(self, symbol: str, analyses: List[Dict[str, Any]], iterations: int = 0) -> Dict[str, Any]:
+    def generate_summary(self, analyses: List[Dict[str, Any]], topic: str, iterations: int = 0) -> Dict[str, Any]:
         """Public method to generate a summary from analysis results.
         
         Args:
-            symbol: The stock symbol being analyzed
             analyses: List of analysis results to summarize
+            topic: The topic being analyzed
             iterations: Number of iterations performed
             
         Returns:
             Dictionary containing the summary results
         """
-        return self.run(analyses, symbol=symbol, iterations=iterations) 
+        return self.run(analyses, topic=topic, iterations=iterations) 

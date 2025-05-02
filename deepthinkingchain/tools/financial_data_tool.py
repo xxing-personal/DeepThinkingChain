@@ -10,7 +10,7 @@ import numpy as np
 from typing import Dict, Any, Optional, List, Union
 from dotenv import load_dotenv
 
-from tools.tool import Tool
+from deepthinkingchain.tools.tool import Tool
 
 # Load environment variables
 load_dotenv()

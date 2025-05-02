@@ -110,10 +110,10 @@ class PromptManager:
             return None
     
     def load_templates_from_directory(self, directory: str) -> int:
-        """Load templates from JSON and markdown files in a directory.
+        """Load templates from markdown files in a directory.
         
         Args:
-            directory: Directory path containing template JSON and markdown files
+            directory: Directory path containing template markdown files
             
         Returns:
             Number of templates loaded
@@ -125,29 +125,7 @@ class PromptManager:
             print(f"Warning: Template directory {directory} does not exist")
             return count
             
-        # First check for subdirectories
-        for item in os.listdir(directory):
-            item_path = os.path.join(directory, item)
-            
-            # If there's a templates directory, load JSON templates from it
-            if os.path.isdir(item_path) and item == "templates":
-                print(f"Loading templates from {item_path}")
-                for filename in os.listdir(item_path):
-                    if filename.endswith('.json'):
-                        file_path = os.path.join(item_path, filename)
-                        if self.load_template_from_json(file_path):
-                            count += 1
-            
-            # If there's a template directory, load markdown templates from it
-            if os.path.isdir(item_path) and item == "template":
-                print(f"Loading templates from {item_path}")
-                for filename in os.listdir(item_path):
-                    if filename.endswith('.md'):
-                        file_path = os.path.join(item_path, filename)
-                        if self.load_template_from_markdown(file_path):
-                            count += 1
-        
-        # Also load JSON and markdown files from the main directory
+        # Load markdown files from the directory
         for filename in os.listdir(directory):
             filepath = os.path.join(directory, filename)
             
@@ -155,13 +133,8 @@ class PromptManager:
             if os.path.isdir(filepath):
                 continue
                 
-            # Handle JSON templates
-            if filename.endswith('.json'):
-                if self.load_template_from_json(filepath):
-                    count += 1
-            
             # Handle markdown templates
-            elif filename.endswith('.md'):
+            if filename.endswith('.md'):
                 if self.load_template_from_markdown(filepath):
                     count += 1
         

@@ -1,86 +1,134 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-Run script for DeepThinkingChain.
+Script to run the DeepThinkingChain orchestrator.
 
-This script demonstrates how to use the DeepThinkingChain for
-multi-agent investment analysis on a specified stock symbol.
+This script provides a command-line interface to run the DeepThinkingChain
+for analyzing queries using multi-agent orchestration.
 """
 
 import argparse
+import json
+import logging
+import os
 import sys
-import time
-from deepthinkingchain import DeepThinkingChain
+from typing import Dict, Any
 
+from deepthinkingchain.orchestrator import DeepThinkingChain
 
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Run DeepThinkingChain analysis for a stock symbol')
+def setup_logging(log_level: str = "INFO") -> None:
+    """Set up logging configuration.
     
-    parser.add_argument('symbol', 
-                        type=str, 
-                        help='Stock symbol to analyze (e.g., NVDA, AAPL)')
+    Args:
+        log_level: The logging level to use (default: INFO)
+    """
+    numeric_level = getattr(logging, log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError(f"Invalid log level: {log_level}")
     
-    parser.add_argument('-i', '--iterations', 
-                        type=int, 
-                        default=3,
-                        help='Maximum number of analysis iterations (default: 3)')
-    
-    parser.add_argument('-q', '--quiet', 
-                        action='store_true',
-                        help='Run in quiet mode (no progress output)')
-    
-    return parser.parse_args()
+    logging.basicConfig(
+        level=numeric_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
 
+def run_analysis(query: str, max_iterations: int = 30, session_id: str = None, verbose: bool = True) -> Dict[str, Any]:
+    """Run the DeepThinkingChain analysis.
+    
+    Args:
+        query: The query to analyze
+        max_iterations: Maximum number of iterations to perform
+        session_id: Optional session ID to use
+        verbose: Whether to print progress messages
+        
+    Returns:
+        Dict containing the analysis results
+    """
+    # Create and run the DeepThinkingChain
+    chain = DeepThinkingChain(
+        user_input=query,
+        max_iterations=max_iterations,
+        session_id=session_id
+    )
+    
+    # Run the analysis
+    results = chain.run(verbose=verbose)
+    
+    return results
 
 def main():
     """Main entry point for the script."""
-    # Parse command line arguments
-    args = parse_args()
+    parser = argparse.ArgumentParser(
+        description="Run DeepThinkingChain analysis on a query."
+    )
     
-    print(f"🔍 Starting DeepThinkingChain analysis for {args.symbol}")
-    print(f"   Max iterations: {args.iterations}")
-    print(f"   Verbose mode: {not args.quiet}")
-    print("-" * 50)
+    parser.add_argument(
+        "query",
+        help="The query to analyze"
+    )
+    
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=30,
+        help="Maximum number of iterations to perform (default: 30)"
+    )
+    
+    parser.add_argument(
+        "--session-id",
+        help="Optional session ID to use"
+    )
+    
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set the logging level (default: INFO)"
+    )
+    
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Run in quiet mode (minimal output)"
+    )
+    
+    parser.add_argument(
+        "--output",
+        help="Optional output file to save results (in addition to automatic saving)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Set up logging
+    setup_logging(args.log_level)
     
     try:
-        # Initialize the DeepThinkingChain
-        start_time = time.time()
-        chain = DeepThinkingChain(
-            symbol=args.symbol,
-            max_iterations=args.iterations
+        # Run the analysis
+        results = run_analysis(
+            query=args.query,
+            max_iterations=args.max_iterations,
+            session_id=args.session_id,
+            verbose=not args.quiet
         )
         
-        # Run the analysis
-        results = chain.run(verbose=not args.quiet)
+        # Print summary
+        if not args.quiet:
+            print("\nAnalysis Results:")
+            print(f"Summary: {results['summary']}")
+            print(f"\nNumber of iterations performed: {results['iterations']}")
+            print(f"Execution time: {results['execution_time_seconds']:.2f} seconds")
         
-        # Display summary information
-        print("\n" + "=" * 50)
-        print(f"📊 Analysis Summary for {args.symbol}")
-        print("=" * 50)
-        print(f"Iterations completed: {results['iterations']}")
-        print(f"Total time: {results['execution_time_seconds']:.2f} seconds")
+        # Save to additional output file if specified
+        if args.output:
+            with open(args.output, 'w') as f:
+                json.dump(results, f, indent=2)
+                if not args.quiet:
+                    print(f"\nResults also saved to: {args.output}")
         
-        # Display recommendation if available
-        if 'summary' in results and 'recommendation' in results['summary']:
-            recommendation = results['summary']['recommendation']
-            confidence = results['summary'].get('confidence', 'N/A')
-            print(f"\nRecommendation: {recommendation.upper()} (Confidence: {confidence})")
+        return 0
         
-        # Display key points if available
-        if 'summary' in results and 'key_points' in results['summary']:
-            print("\nKey Points:")
-            for idx, point in enumerate(results['summary']['key_points'], 1):
-                print(f"  {idx}. {point}")
-                
-        print(f"\nDetailed results saved to: results/{args.symbol}_analysis.json")
-        
-    except KeyboardInterrupt:
-        print("\n\n⚠️ Analysis interrupted by user")
-        sys.exit(1)
     except Exception as e:
-        print(f"\n\n❌ Error running analysis: {str(e)}")
-        sys.exit(1)
+        logging.error(f"Error running analysis: {str(e)}", exc_info=True)
+        return 1
 
-
-if __name__ == '__main__':
-    main() 
+if __name__ == "__main__":
+    sys.exit(main()) 

@@ -8,19 +8,19 @@ This example demonstrates how to use the DeepThinkingChain in a Python script.
 from deepthinkingchain import DeepThinkingChain
 
 
-def analyze_stock(symbol: str, max_iterations: int = 3) -> None:
+def analyze_query(query: str, max_iterations: int = 3) -> None:
     """
-    Analyze a stock using the DeepThinkingChain.
+    Analyze a query using the DeepThinkingChain.
     
     Args:
-        symbol: The stock symbol to analyze (e.g., 'AAPL')
+        query: The query to analyze (e.g., 'Analyze AAPL stock performance')
         max_iterations: Maximum number of analysis iterations
     """
-    print(f"Analyzing {symbol}...")
+    print(f"Analyzing query: {query}")
     
     # Initialize the chain
     chain = DeepThinkingChain(
-        symbol=symbol,
+        user_input=query,
         max_iterations=max_iterations
     )
     
@@ -31,11 +31,11 @@ def analyze_stock(symbol: str, max_iterations: int = 3) -> None:
     summary = results['summary']
     
     print("\nAnalysis Results:")
-    print(f"Recommendation: {summary.get('recommendation', 'N/A')}")
-    print(f"Confidence: {summary.get('confidence', 'N/A')}")
+    print(f"Summary: {summary}")
     
     # You can access all analyses performed
-    print(f"\nNumber of analyses performed: {len(results['analyses'])}")
+    print(f"\nNumber of iterations performed: {results['iterations']}")
+    print(f"Execution time: {results['execution_time_seconds']:.2f} seconds")
     
     # The full results are available for further processing
     return results
@@ -43,9 +43,14 @@ def analyze_stock(symbol: str, max_iterations: int = 3) -> None:
 
 if __name__ == "__main__":
     # Example: Analyze Apple stock with 2 iterations
-    results = analyze_stock("AAPL", max_iterations=2)
+    query = "Analyze Apple (AAPL) stock performance and provide investment recommendations"
+    results = analyze_query(query, max_iterations=2)
     
-    # Example: You could analyze multiple stocks
-    # stocks = ["AAPL", "MSFT", "GOOG", "AMZN"]
-    # for stock in stocks:
-    #     analyze_stock(stock) 
+    # Example: You could analyze multiple queries
+    # queries = [
+    #     "Analyze Microsoft (MSFT) stock performance",
+    #     "Analyze Google (GOOGL) stock performance",
+    #     "Analyze Amazon (AMZN) stock performance"
+    # ]
+    # for query in queries:
+    #     analyze_query(query) 

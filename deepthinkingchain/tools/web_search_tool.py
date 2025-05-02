@@ -11,7 +11,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from urllib.parse import quote_plus
 
-from tools.tool import Tool
+from deepthinkingchain.tools.tool import Tool
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

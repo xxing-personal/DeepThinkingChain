@@ -10,8 +10,8 @@ import sys
 import logging
 from typing import Dict, Any, List, Optional
 
-from tools.tool import Tool
-from sandbox.secure_executor import SecureExecutor
+from deepthinkingchain.tools.tool import Tool
+from deepthinkingchain.sandbox.secure_executor import SecureExecutor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

@@ -174,25 +174,25 @@ class MemoryManager:
         return self.memory
     
     def _initialize_memory(self) -> Dict[str, Any]:
-        """Initialize a new memory structure for the analysis process.
+        """Initialize a new memory structure with only essential fields.
         
         Returns:
-            Dict containing the initialized memory structure
+            Dict containing the minimal initialized memory structure
         """
         self.memory = {
             "id": self.memory_id,
             "name": self.name,
-            "iteration_counter": 0,
-            "max_iterations": self.max_iterations,
-            "user_intent": "",
-            "iterations": [],
-            "completion_percentage": 0,
-            "questions": [],
-            "links": [],
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "last_updated": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "completion_percentage": 0.0,
             "summary": "",
+            "max_iterations": self.max_iterations,
+            "iteration_counter": 0,
+            "iterations": [],
+            # Empty container for dynamically added data
+            "data": {}
         }
         self.save_memory()
-        print(f"📝 Created new memory for {self.name} (ID: {self.memory_id})")
         return self.memory
     
     def save_memory(self) -> bool:
@@ -217,7 +217,7 @@ class MemoryManager:
         """Get the current memory state.
         
         Returns:
-            Dict containing the current memory
+            Dict containing the current memory state
         """
         return self.memory
     
@@ -239,6 +239,59 @@ class MemoryManager:
         
         return self.memory
     
+    def ensure_field(self, field_path: str, default_value: Any = None) -> Any:
+        """Ensure a field exists in the memory structure, creating it if necessary.
+        
+        This method allows dynamically adding fields to the memory structure as needed,
+        rather than having to define all fields upfront.
+        
+        Args:
+            field_path: Dot-notation path to the field (e.g., "data.iterations.0.result")
+            default_value: Default value to use if the field doesn't exist
+            
+        Returns:
+            The current value of the field (or the default if newly created)
+        """
+        # Split the path into components
+        components = field_path.split('.')
+        
+        # Start at the root of the memory
+        current = self.memory
+        
+        # Navigate to the parent of the target field
+        for i, component in enumerate(components[:-1]):
+            # If we need to index into a list
+            if component.isdigit() and isinstance(current, list):
+                index = int(component)
+                # Extend the list if necessary
+                while len(current) <= index:
+                    current.append({})
+                current = current[index]
+            else:
+                # If the component doesn't exist yet, create it
+                if component not in current:
+                    # If the next component is a digit, create a list
+                    if i+1 < len(components) and components[i+1].isdigit():
+                        current[component] = []
+                    else:
+                        current[component] = {}
+                current = current[component]
+        
+        # Set the final field if it doesn't exist
+        last_component = components[-1]
+        if last_component.isdigit() and isinstance(current, list):
+            index = int(last_component)
+            # Extend the list if necessary
+            while len(current) <= index:
+                current.append(default_value if default_value is not None else {})
+            if current[index] is None:
+                current[index] = default_value
+            return current[index]
+        else:
+            if last_component not in current:
+                current[last_component] = default_value
+            return current[last_component]
+    
     def add_iteration(self, iteration_type: AgentType, iteration_data: Dict[str, Any]) -> Dict[str, Any]:
         """Add a new iteration to the memory.
         
@@ -248,51 +301,41 @@ class MemoryManager:
         Returns:
             Dict containing the updated memory data
         """
-        # Add the iteration and update completion percentage
-        self.iteration_counter += 1
-        self._update_completion_percentage()
+        # Ensure the iterations array exists
+        iterations = self.ensure_field("data.iterations", [])
         
-        # add iteration summary
-        full_result = "/n ".join(": ".join((str(k),str(v))) for k,v in iteration_data.items())
+        # Create a new iteration entry
+        iteration_entry = {
+            "type": str(iteration_type),
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "data": iteration_data
+        }
         
-        # check if there is summary in iteration_Data
-        if 'thinking' in iteration_data:
-            thinking_str = iteration_data['thinking']
-        else:
-            if iteration_type == AgentType.TOOL:
-                # cutoff tool result because it is too long
-                thinking_str = full_result[:100]
-            else:
-                thinking_str = full_result
-
-        self.memory["iterations"].append(str(iteration_type.value) + "_" + str(self.iteration_counter) + ": \n" + thinking_str)
-
-        # update user intent
-        if 'user_intent' in iteration_data:
-            self.memory["user_intent"] += "/n user_intent_" + str(self.iteration_counter) + ": \n" + iteration_data['user_intent']
-
-        # deal with questions:
-        if 'questions' in iteration_data:
-            for question in iteration_data['questions']:
-                # if answer exists, add it to the question
-                if 'answer' in question:
-                    self.add_answer(question['text'], question['answer'])
-                else:
-                    self.add_question(question['text'])
+        # Add the iteration to the list
+        iterations.append(iteration_entry)
         
-        # deal with links:
-        if 'links' in iteration_data:
-            for link in iteration_data['links']:
-                # if visited, update the status
-                if link['status'] == 'visited':
-                    self.update_link_status(link['url'], link['status'], link['content'])
-                else:
-                    self.add_link(link['url'], link['status'], link['content'])
-        # update summary:
-        if 'summary' in iteration_data:
-            self.memory["summary"] += iteration_data['summary']
-
+        # Update the last_updated timestamp
+        self.memory["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Update completion percentage if present in the data
+        if "completion_percentage" in iteration_data:
+            self.ensure_field("data.completion_percentage", iteration_data["completion_percentage"])
+        
+        # Extract and store questions if present
+        if "questions" in iteration_data:
+            questions = self.ensure_field("data.questions", [])
+            for question in iteration_data["questions"]:
+                if question not in questions:
+                    questions.append(question)
+        
+        # Extract and store summary information if present
+        if "summary" in iteration_data:
+            self.ensure_field("data.summary", "")
+            self.memory["data"]["summary"] += f"\n{iteration_data['summary']}"
+            
+        # Save changes to disk
         self.save_memory()
+        
         return self.memory
     
     def _update_completion_percentage(self, new_completion_percentage: float = None) -> float:
@@ -625,3 +668,44 @@ class MemoryManager:
             output_dict["visited_link"] = [l.url for l in self.links if l.status == "visited"]
             output_dict["failed_link"] = [l.url for l in self.links if l.status == "failed"]
         return output_dict
+
+    def get_completeness_percent(self) -> float:
+        """Get the current completion percentage of the analysis.
+        
+        Returns:
+            float: Completion percentage between 0 and 100
+        """
+        # Get the current completion percentage from memory
+        completion = self.memory.get("completion_percentage", 0.0)
+        
+        # Ensure the value is between 0 and 100
+        return max(0.0, min(100.0, float(completion)))
+
+    def update_completion_percentage(self, new_percentage: float) -> float:
+        """Update the completion percentage of the analysis.
+        
+        Args:
+            new_percentage: New completion percentage (0-100)
+            
+        Returns:
+            float: Updated completion percentage
+        """
+        # Ensure the value is between 0 and 100
+        new_percentage = max(0.0, min(100.0, float(new_percentage)))
+        
+        # Update the memory
+        self.memory["completion_percentage"] = new_percentage
+        
+        # Save the updated memory
+        self.save_memory()
+        
+        return new_percentage
+
+    def set_next_step(self, step: str) -> None:
+        """Set the next step in the analysis workflow.
+        
+        Args:
+            step: The name of the next step
+        """
+        self.memory["next_step"] = step
+        self.save_memory()

@@ -35,7 +35,7 @@ except ImportError:
 class Model:
     """Wrapper for language model interactions."""
     
-    def __init__(self, model: Optional[str] = "openai/o3-mini", **kwargs):
+    def __init__(self, model: Optional[str] = "anthropic/claude-3-sonnet", **kwargs):
         """Initialize a Model instance.
         
         Args:
@@ -44,7 +44,7 @@ class Model:
         """
         # Use default model if None is provided
         if model is None:
-            model = "openai/o3-mini"
+            model = "anthropic/claude-3-sonnet"
             
         self.model_id = model
         self.config = kwargs
@@ -107,12 +107,17 @@ class Model:
             logger.debug(f"Messages: {messages}")
             
             if LITELLM_AVAILABLE:
+                # Configure LiteLLM to not use proxies
+                litellm.drop_params = True
+                litellm.proxies = None
+                
                 response = completion(
                     model=self.model_id,
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens
                 )
+                logger.debug(f"Raw LiteLLM response: {response}")
                 return response
             else:
                 logger.error("LiteLLM not available")
@@ -148,14 +153,75 @@ class Model:
         """
         logger.info(f"Generating JSON with model {self.model_id}")
         
-        # This is a stub implementation
         try:
-            return {
-                "result": "success",
-                "model": self.model_id,
-                "response": f"Stub response from {self.model_id}",
-                "prompt_length": len(prompt)
-            }
+            # Create messages for the chat completion
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant that generates JSON responses according to the specified format. Always respond with valid JSON. Do not include any explanatory text or markdown formatting - just the raw JSON object."},
+                {"role": "user", "content": prompt}
+            ]
+            
+            # Generate response
+            response = self._chat_completion(messages, temperature=0.7)
+            logger.debug(f"Raw response from _chat_completion: {response}")
+            
+            # Extract content from LiteLLM response
+            if isinstance(response, dict):
+                if "error" in response:
+                    logger.error(f"Error in response: {response['error']}")
+                    return response
+                
+                # Handle LiteLLM response format
+                if "choices" in response and len(response["choices"]) > 0:
+                    if isinstance(response["choices"][0], dict):
+                        content = response["choices"][0].get("message", {}).get("content", "")
+                    else:
+                        content = response["choices"][0].message.content
+                else:
+                    content = str(response)
+            else:
+                content = str(response)
+            
+            logger.debug(f"Extracted content: {content}")
+            
+            # Clean up the content
+            content = content.strip()
+            
+            # Try to find JSON in the response
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                content = json_match.group(0)
+            
+            # Remove any leading/trailing whitespace or newlines
+            content = content.strip()
+            
+            # Ensure content starts and ends with curly braces
+            if not content.startswith('{'):
+                content = '{' + content
+            if not content.endswith('}'):
+                content = content + '}'
+            
+            # Try to parse the JSON
+            try:
+                result = json.loads(content)
+                return result
+            except json.JSONDecodeError as e:
+                logger.warning(f"JSON parsing error: {str(e)}")
+                # Try to fix common JSON issues
+                content = re.sub(r'(?<!\\)"', '\\"', content)  # Escape unescaped quotes
+                content = re.sub(r',\s*}', '}', content)  # Remove trailing commas
+                content = re.sub(r',\s*]', ']', content)  # Remove trailing commas in arrays
+                content = re.sub(r'\\+n', ' ', content)  # Replace newlines with spaces
+                content = re.sub(r'\\+t', ' ', content)  # Replace tabs with spaces
+                content = re.sub(r'\\+r', ' ', content)  # Replace carriage returns with spaces
+                content = re.sub(r'\\+\"', '"', content)  # Fix escaped quotes
+                content = re.sub(r'\\+\'', "'", content)  # Fix escaped single quotes
+                try:
+                    result = json.loads(content)
+                    return result
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse content: {content}")
+                    return {"error": f"Failed to parse JSON: {str(e)}"}
+                
         except Exception as e:
             logger.error(f"Error generating JSON: {str(e)}")
             return {"error": str(e)}

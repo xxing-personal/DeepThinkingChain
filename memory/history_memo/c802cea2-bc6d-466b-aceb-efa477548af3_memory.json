@@ -1,0 +1,19 @@
+{
+  "id": "c802cea2-bc6d-466b-aceb-efa477548af3",
+  "name": "c802cea2-bc6d-466b-aceb-efa477548af3",
+  "created_at": "2025-05-01 11:06:03",
+  "last_updated": "2025-05-01 11:06:03",
+  "completion_percentage": 0.0,
+  "summary": "",
+  "max_iterations": 30,
+  "iteration_counter": 0,
+  "iterations": [],
+  "data": {
+    "max_iterations": 2,
+    "user_input": "Analyze Apple (AAPL) stock performance and provide investment recommendations",
+    "topic": "Analyze_Apple_(AAPL)_stock_performance_and_provide"
+  },
+  "questions": [],
+  "links": [],
+  "user_intent": "Analyze Apple (AAPL) stock performance and provide investment recommendations"
+}

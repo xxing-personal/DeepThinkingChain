@@ -102,12 +102,23 @@ class PromptTemplate:
         return placeholders
 
     def _extract_output_format(self, template_str: str) -> str:
-        """Extract the output format from the string. assuming string is in markdown format
+        """Extract the output format from the string, assuming string is in markdown format.
 
         Returns:
             The output format string
         """
-        output_format_match = re.search(r'## Output:\s*\n(.*?)(?:\n\n|$)', template_str, re.DOTALL)
+        # First try to find a JSON output format
+        json_format_match = re.search(r'```json\n(.*?)```', template_str, re.DOTALL)
+        if json_format_match:
+            # Extract the JSON format and clean it up
+            output_format = json_format_match.group(1).strip()
+            # Remove any leading/trailing whitespace or newlines
+            output_format = re.sub(r'^\s*', '', output_format)
+            output_format = re.sub(r'\s*$', '', output_format)
+            return output_format
+        
+        # If no JSON format, try to find a general output format
+        output_format_match = re.search(r'## Output Format\s*\n(.*?)(?:\n\n|$)', template_str, re.DOTALL)
         if output_format_match:
             output_format = output_format_match.group(1).strip()
             # If the output format starts with a format specifier (like "json"), remove it
@@ -115,6 +126,7 @@ class PromptTemplate:
             if len(format_lines) > 1:
                 return format_lines[1].strip()
             return output_format
+            
         logger.warning(f"No output format found in the template")
         return ""
 
@@ -149,14 +161,25 @@ class PromptTemplate:
         missing = self._placeholders - set(kwargs.keys())
         if missing:
             logger.warning(f"Missing required placeholders: {', '.join(missing)}")
-            for i in missing:
-                kwargs[i] = " "
+            for placeholder in missing:
+                kwargs[placeholder] = ""
+                
         # Format the template
-        formatted_template = self.template_str.format(**kwargs)
+        try:
+            formatted_template = self.template_str.format(**kwargs)
+        except KeyError as e:
+            logger.error(f"Error formatting template: {str(e)}")
+            logger.error(f"Template string: {self.template_str}")
+            logger.error(f"Available kwargs: {kwargs}")
+            # Try to fix the template string by removing problematic placeholders
+            template_str = self.template_str
+            for key in str(e).strip("'").split():
+                template_str = template_str.replace(f"{{{key}}}", "")
+            formatted_template = template_str
 
-        # Add output format if provided
-        if self.output_format:
-            formatted_template += f"\n\n## Output:\n{self.output_format}"
+        # Add output format if provided and not already in template
+        if self.output_format and "```json" not in formatted_template:
+            formatted_template += f"\n\n## Output Format\n```json\n{self.output_format}\n```"
 
         return formatted_template
 

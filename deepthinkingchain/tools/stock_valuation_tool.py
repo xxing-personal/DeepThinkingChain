@@ -4,7 +4,7 @@ Stock Valuation Tool for DeepThinkingChain.
 This module provides tools for calculating stock price targets using various methods.
 """
 
-from tools.tool import Tool
+from deepthinkingchain.tools.tool import Tool
 from typing import Dict, Any
 
 class StockValuationTool(Tool):

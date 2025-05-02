@@ -1,0 +1,40 @@
+{
+  "session_id": "13397a5b-c388-462a-937a-10361abbf0fb",
+  "topic": "Analyze_Apple_(AAPL)_stock_performance_and_provide",
+  "iterations": 3,
+  "summary": {
+    "timestamp": "2025-05-01 16:19:36",
+    "summary": "Summary of 0 analyses (stub implementation)",
+    "recommendation": "HOLD",
+    "confidence": "medium",
+    "key_points": [
+      "This is a stub implementation",
+      "Real implementation would analyze all results"
+    ],
+    "run_at": 1746141576.342477,
+    "execution_time": 6.389617919921875e-05
+  },
+  "start_time": "2025-05-01T16:19:21.640657",
+  "end_time": "2025-05-01T16:19:36.342569",
+  "execution_time_seconds": 14.701912,
+  "memory": {
+    "id": "13397a5b-c388-462a-937a-10361abbf0fb",
+    "name": "13397a5b-c388-462a-937a-10361abbf0fb",
+    "created_at": "2025-05-01 16:19:21",
+    "last_updated": "2025-05-01 16:19:21",
+    "completion_percentage": 0.0,
+    "summary": "",
+    "max_iterations": 30,
+    "iteration_counter": 0,
+    "iterations": [],
+    "data": {
+      "max_iterations": 30,
+      "user_input": "Analyze Apple (AAPL) stock performance and provide investment recommendations",
+      "topic": "Analyze_Apple_(AAPL)_stock_performance_and_provide",
+      "iterations": []
+    },
+    "questions": [],
+    "links": [],
+    "user_intent": "Analyze Apple (AAPL) stock performance and provide investment recommendations"
+  }
+}

@@ -12,7 +12,7 @@ import html2text
 from urllib.parse import urlparse
 import logging
 
-from tools.tool import Tool
+from deepthinkingchain.tools.tool import Tool
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

@@ -20,7 +20,9 @@ class ToolAgent(Agent):
     def __init__(self, 
                  tools_name: str = None,
                  tools_params: Dict[str, Any] = None,
-                 ):
+                 memory_manager=None,
+                 prompt_template_name: str = None,
+                 model_name: str = None):
         """Initialize the ToolAgent with a specific tool.
         
         Args:
@@ -31,7 +33,7 @@ class ToolAgent(Agent):
             tools_params: Parameters to use with the tool.
         """
         # Initialize the base Agent class
-        super().__init__()
+        super().__init__(prompt_template_name=prompt_template_name, model_name=model_name, memory_manager=memory_manager)
         
         # Set the agent type
         self.agent_type = AgentType.TOOL

@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set the path to the prompts directory
-PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'prompts')
+PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', 'template')
 prompt_manager = PromptManager(PROMPTS_DIR)
 
 
@@ -32,7 +32,7 @@ class Agent:
     """
     
     def __init__(self, prompt_template_name: str = None, prompt: str = None,
-                memory_manager=None, model_name: str = 'openai/o3-mini'):
+                memory_manager=None, model_name: str = 'anthropic/claude-3-opus-20240229'):
         """
         Initialize the Agent.
         
@@ -127,13 +127,51 @@ class Agent:
         Returns:
             Dict[str, Any]: Parsed results as a dictionary
         """
-        # format the results
+        # If results is already a dictionary, return it
         if isinstance(results, dict):
             return results
-        else:
-            return {
-                "output": results
-            }
+            
+        # If results is a string, try to parse it as JSON
+        if isinstance(results, str):
+            try:
+                # Try to find JSON in the string
+                import re
+                import json
+                
+                # Try to find JSON block
+                json_match = re.search(r'```json\n(.*?)```', results, re.DOTALL)
+                if json_match:
+                    content = json_match.group(1)
+                else:
+                    # Try to find JSON without code block markers
+                    json_match = re.search(r'\{.*\}', results, re.DOTALL)
+                    if json_match:
+                        content = json_match.group(0)
+                    else:
+                        content = results
+                
+                # Clean up the content
+                content = content.strip()
+                if not content.startswith('{'):
+                    content = '{' + content
+                if not content.endswith('}'):
+                    content = content + '}'
+                
+                # Try to parse JSON
+                try:
+                    return json.loads(content)
+                except json.JSONDecodeError:
+                    # Try to fix common JSON issues
+                    content = content.replace("'", '"')  # Replace single quotes with double quotes
+                    content = re.sub(r',\s*}', '}', content)  # Remove trailing commas
+                    content = re.sub(r',\s*]', ']', content)  # Remove trailing commas in arrays
+                    return json.loads(content)
+            except Exception as e:
+                logger.warning(f"Failed to parse results as JSON: {str(e)}")
+                return {"output": results}
+        
+        # If results is anything else, wrap it in a dictionary
+        return {"output": results}
         
     def save_to_memory(self) -> bool:
         """
